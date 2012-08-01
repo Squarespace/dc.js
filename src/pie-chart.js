@@ -16,12 +16,12 @@ dc.pieChart = function(selector, hierarchical) {
     var chart = dc.singleSelectionChart(dc.colorChart(dc.baseChart({})), hierarchical);
 
     chart.label(function(d) {
-        return chart.keyRetriever()(d.data);
+        return chart.valuePrinter()(chart.keyRetriever()(d.data));
     });
     chart.renderLabel(true);
 
     chart.title(function(d) {
-        return d.data.key + ": " + d.data.value;
+        return chart.valuePrinter()(d.data.key) + ": " + chart.valuePrinter()(d.data.value);
     });
 
     chart.transitionDuration(350);

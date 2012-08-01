@@ -71,35 +71,32 @@ dc.dateFormat= d3.time.format("%m/%d/%Y");
 
 dc.printers = {};
 
-dc.printers.filter = function(filter) {
-    var s = "";
+dc.printers.emptyValueLabel = "(none)";
 
-    if (filter) {
-        if (filter instanceof Array) {
-            if (filter.length >= 2)
-                s = "[" + printSingleValue(filter[0]) + " -> " + printSingleValue(filter[1]) + "]";
-            else if (filter.length >= 1)
-                s = printSingleValue(filter[0]);
-        } else {
-            s = printSingleValue(filter)
-        }
-    }
-
-    return s;
+dc.printers.value = function(filter) {
+	if ( filter == null || filter == undefined || filter == "" )
+		return dc.printers.emptyValueLabel;
+	else if (filter instanceof Date)
+        return dc.dateFormat(filter);
+    else if(typeof(filter) == "string")
+        return filter;
+    else if(typeof(filter) == "number")
+        return Math.round(filter);
+    else
+    	return "" + filter;
 };
 
-function printSingleValue(filter) {
-    var s = "" + filter;
+dc.printers.filter = function(filter) {
+     var valuePrinter = dc.printers.value;
+     if (filter instanceof Array) {
+            if (filter.length >= 2)
+                return "[" + valuePrinter(filter[0]) + " -> " + valuePrinter(filter[1]) + "]";
+            else if (filter.length >= 1)
+                return valuePrinter(filter[0]);
+     }
+     return valuePrinter(filter);
+};
 
-    if (filter instanceof Date)
-        s = dc.dateFormat(filter);
-    else if(typeof(filter) == "string")
-        s = filter;
-    else if(typeof(filter) == "number")
-        s = Math.round(filter);
-
-    return s;
-}
 dc.baseChart = function(chart) {
     var _dimension;
     var _group;
@@ -118,18 +115,20 @@ dc.baseChart = function(chart) {
     };
 
     var _label = function(d) {
-        return d.key;
+        return dc.printers.value(d.key);
     };
     var _renderLabel = false;
 
     var _title = function(d) {
-        return d.key + ": " + d.value;
+        return dc.printers.value(d.key) + ": " + dc.printers.value(d.value);
     };
     var _renderTitle = false;
 
     var _transitionDuration = 750;
 
     var _filterPrinter = dc.printers.filter;
+    
+    var _valuePrinter = dc.printers.value;
 
     chart.dimension = function(d) {
         if (!arguments.length) return _dimension;
@@ -212,6 +211,12 @@ dc.baseChart = function(chart) {
             .attr("width", chart.width())
             .attr("height", chart.height());
         return _svg;
+    };
+
+    chart.valuePrinter = function(_){
+        if(!arguments.length) return _valuePrinter;
+        _valuePrinter = _;
+        return chart;
     };
 
     chart.filterPrinter = function(_){
@@ -731,12 +736,12 @@ dc.pieChart = function(selector, hierarchical) {
     var chart = dc.singleSelectionChart(dc.colorChart(dc.baseChart({})), hierarchical);
 
     chart.label(function(d) {
-        return chart.keyRetriever()(d.data);
+        return chart.valuePrinter()(chart.keyRetriever()(d.data));
     });
     chart.renderLabel(true);
 
     chart.title(function(d) {
-        return d.data.key + ": " + d.data.value;
+        return chart.valuePrinter()(d.data.key) + ": " + chart.valuePrinter()(d.data.value);
     });
 
     chart.transitionDuration(350);

@@ -16,18 +16,20 @@ dc.baseChart = function(chart) {
     };
 
     var _label = function(d) {
-        return d.key;
+        return dc.printers.value(d.key);
     };
     var _renderLabel = false;
 
     var _title = function(d) {
-        return d.key + ": " + d.value;
+        return dc.printers.value(d.key) + ": " + dc.printers.value(d.value);
     };
     var _renderTitle = false;
 
     var _transitionDuration = 750;
 
     var _filterPrinter = dc.printers.filter;
+    
+    var _valuePrinter = dc.printers.value;
 
     chart.dimension = function(d) {
         if (!arguments.length) return _dimension;
@@ -110,6 +112,12 @@ dc.baseChart = function(chart) {
             .attr("width", chart.width())
             .attr("height", chart.height());
         return _svg;
+    };
+
+    chart.valuePrinter = function(_){
+        if(!arguments.length) return _valuePrinter;
+        _valuePrinter = _;
+        return chart;
     };
 
     chart.filterPrinter = function(_){
