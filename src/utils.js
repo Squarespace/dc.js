@@ -5,7 +5,7 @@ dc.printers = {};
 dc.printers.emptyValueLabel = "(none)";
 
 dc.printers.value = function(filter) {
-	if ( filter == null || filter == undefined || filter == "" )
+	if ( filter == null || filter == undefined || filter === "" )
 		return dc.printers.emptyValueLabel;
 	else if (filter instanceof Date)
         return dc.dateFormat(filter);
