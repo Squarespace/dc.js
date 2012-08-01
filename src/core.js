@@ -11,6 +11,26 @@ dc.hasChart = function(chart) {
     return dc._charts.indexOf(chart) >= 0;
 };
 
+dc._isDescendantNode = function(parent, child) {
+    var node = child.parentNode;
+     while (node != null) {
+         if (node == parent) {
+             return true;
+         }
+         node = node.parentNode;
+     }
+     return false;
+};
+
+dc.getChartFor = function(element) {
+    for ( var i = 0; i < dc._charts.length; i++ ) {
+        var ch = dc._charts[i];
+	if ( dc._isDescendantNode(ch.root().node(), element) )
+	    return ch;
+    }
+    return null;
+};
+
 dc.deregisterAllCharts = function() {
     dc._charts = [];
 };

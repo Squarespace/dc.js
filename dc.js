@@ -11,6 +11,27 @@ dc.hasChart = function(chart) {
     return dc._charts.indexOf(chart) >= 0;
 };
 
+dc._isDescendantNode = function(parent, child) {
+    var node = child.parentNode;
+     while (node != null) {
+         if (node == parent) {
+             return true;
+         }
+         node = node.parentNode;
+     }
+     return false;
+};
+
+dc.getChartFor = function(element) {
+    var e = (event || d3.event);
+    for ( var i = 0; i < dc._charts.length; i++ ) {
+        var ch = dc._charts[i];
+	if ( dc._isDescendantNode(ch.root().node(), element) )
+	    return ch;
+    }
+    return null;
+};
+
 dc.deregisterAllCharts = function() {
     dc._charts = [];
 };
@@ -230,12 +251,12 @@ dc.baseChart = function(chart) {
     };
 
     chart.turnOnControls = function() {
-        chart.select("a.reset").style("display", null);
+        chart.select(".reset").style("display", null);
         chart.select(".filter").text(chart.filterText()).style("display", null);
     };
 
     chart.turnOffControls = function() {
-        chart.select("a.reset").style("display", "none");
+        chart.select(".reset").style("display", "none");
         chart.select(".filter").style("display", "none").text(chart.filterText());
     };
 
