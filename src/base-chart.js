@@ -132,11 +132,13 @@ dc.baseChart = function(chart) {
 
     chart.turnOnControls = function() {
         chart.select(".reset").style("display", null);
+        chart.select(".filter-pop").style("display", null);
         chart.select(".filter").text(chart.filterText()).style("display", null);
     };
 
     chart.turnOffControls = function() {
         chart.select(".reset").style("display", "none");
+        chart.select(".filter-pop").style("display", "none");
         chart.select(".filter").style("display", "none").text(chart.filterText());
     };
 

@@ -23,7 +23,6 @@ dc._isDescendantNode = function(parent, child) {
 };
 
 dc.getChartFor = function(element) {
-    var e = (event || d3.event);
     for ( var i = 0; i < dc._charts.length; i++ ) {
         var ch = dc._charts[i];
 	if ( dc._isDescendantNode(ch.root().node(), element) )
@@ -252,11 +251,13 @@ dc.baseChart = function(chart) {
 
     chart.turnOnControls = function() {
         chart.select(".reset").style("display", null);
+        chart.select(".filter-pop").style("display", null);
         chart.select(".filter").text(chart.filterText()).style("display", null);
     };
 
     chart.turnOffControls = function() {
         chart.select(".reset").style("display", "none");
+        chart.select(".filter-pop").style("display", "none");
         chart.select(".filter").style("display", "none").text(chart.filterText());
     };
 
