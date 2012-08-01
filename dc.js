@@ -1,5 +1,5 @@
 dc = {
-    version: "0.5.0",
+    version: "0.6.0",
     _charts: []
 };
 
@@ -63,7 +63,42 @@ dc.round.floor = function(n) {
 dc.override = function(obj, functionName, newFunction) {
     var existingFunction = obj[functionName];
     newFunction._ = existingFunction;
-    obj[functionName] = function(){return newFunction(existingFunction);};
+    obj[functionName] = function() {
+        return newFunction(existingFunction);
+    };
+}
+dc.dateFormat= d3.time.format("%m/%d/%Y");
+
+dc.printers = {};
+
+dc.printers.filter = function(filter) {
+    var s = "";
+
+    if (filter) {
+        if (filter instanceof Array) {
+            if (filter.length >= 2)
+                s = "[" + printSingleValue(filter[0]) + " -> " + printSingleValue(filter[1]) + "]";
+            else if (filter.length >= 1)
+                s = printSingleValue(filter[0]);
+        } else {
+            s = printSingleValue(filter)
+        }
+    }
+
+    return s;
+};
+
+function printSingleValue(filter) {
+    var s = "" + filter;
+
+    if (filter instanceof Date)
+        s = dc.dateFormat(filter);
+    else if(typeof(filter) == "string")
+        s = filter;
+    else if(typeof(filter) == "number")
+        s = Math.round(filter);
+
+    return s;
 }
 dc.baseChart = function(chart) {
     var _dimension;
@@ -93,6 +128,8 @@ dc.baseChart = function(chart) {
     var _renderTitle = false;
 
     var _transitionDuration = 750;
+
+    var _filterPrinter = dc.printers.filter;
 
     chart.dimension = function(d) {
         if (!arguments.length) return _dimension;
@@ -177,21 +214,20 @@ dc.baseChart = function(chart) {
         return _svg;
     };
 
-    var _renderFilter = function(f) { 
-        if ( f == null ) { return ""; }
-	if ( Array.isArray(f) ) {
-	    return ">= " + f[0] + ", < " + f[1];
-	}
-	return f.toString();
-    };
-    chart.turnOnReset = function() {
-        chart.select("a.reset").style("display", null);
-        chart.select(".current-filter").text(_renderFilter(chart.currentFilter())).style("display", null);
+    chart.filterPrinter = function(_){
+        if(!arguments.length) return _filterPrinter;
+        _filterPrinter = _;
+        return chart;
     };
 
-    chart.turnOffReset = function() {
+    chart.turnOnControls = function() {
+        chart.select("a.reset").style("display", null);
+        chart.select(".filter").text(_filterPrinter(chart.filter())).style("display", null);
+    };
+
+    chart.turnOffControls = function() {
         chart.select("a.reset").style("display", "none");
-        chart.select(".current-filter").style("display", "none").text(chart.currentFilter());
+        chart.select(".filter").style("display", "none").text(chart.filter());
     };
 
     chart.transitionDuration = function(d) {
@@ -254,10 +290,6 @@ dc.baseChart = function(chart) {
         return chart;
     };
 
-    chart.currentFilter = function() { 
-       // return nothing, chart subclass should override
-       return null;
-    };
     return chart;
 };
 dc.coordinateGridChart = function(chart) {
@@ -400,21 +432,19 @@ dc.coordinateGridChart = function(chart) {
         return chart;
     };
 
-    chart.currentFilter = function() {
-        return _filter;
-    }
-
     chart.filter = function(_) {
+        if (!arguments.length) return _filter;
+
         if (_) {
-            chart._filter(_);
+            _filter = _;
             chart.brush().extent(_);
             chart.dimension().filterRange(_);
-            chart.turnOnReset();
+            chart.turnOnControls();
         } else {
-            chart._filter(null);
+            _filter = null;
             chart.brush().clear();
             chart.dimension().filterAll();
-            chart.turnOffReset();
+            chart.turnOffControls();
         }
 
         return chart;
@@ -563,9 +593,9 @@ dc.singleSelectionChart = function(chart) {
             chart.dimension().filter(_filter);
 
         if (f) {
-            chart.turnOnReset();
+            chart.turnOnControls();
         } else {
-            chart.turnOffReset();
+            chart.turnOffControls();
         }
 
         return chart;
@@ -803,50 +833,70 @@ dc.barChart = function(parent) {
     var MIN_BAR_HEIGHT = 0;
     var BAR_PADDING_BOTTOM = 1;
     var BAR_PADDING_WIDTH = 2;
+    var GROUP_INDEX_NAME = "__group_index__";
 
     var _stack = [];
+    var _barPositionMatrix = [];
 
     var chart = dc.coordinateGridChart({});
 
     chart.transitionDuration(500);
 
     chart.plotData = function() {
-        var bars = chart.g().selectAll("rect.bar")
-            .data(chart.group().all());
+        var groups = combineAllGroups();
 
-        // new
-        bars.enter()
-            .append("rect")
-            .attr("class", "bar")
-            .attr("x", function(d) {
-                return barX(d);
-            })
-            .attr("y", chart.xAxisY())
-            .attr("width", function(d) {
-                return barWidth(d);
-            });
-        dc.transition(bars, chart.transitionDuration())
-            .attr("y", function(d) {
-                return barY(d);
-            })
-            .attr("height", function(d) {
-                return barHeight(d);
-            });
+        precalculateBarPosition(groups);
 
-        // update
-        dc.transition(bars, chart.transitionDuration())
-            .attr("y", function(d) {
-                return barY(d);
-            })
-            .attr("height", function(d) {
-                return barHeight(d);
-            });
+        for (var groupIndex = 0; groupIndex < groups.length; ++groupIndex) {
+            var group = groups[groupIndex];
 
-        // delete
-        dc.transition(bars.exit(), chart.transitionDuration())
-            .attr("y", chart.xAxisY())
-            .attr("height", 0);
+            var bars = chart.g().selectAll("rect.stack" + groupIndex)
+                .data(group.all());
+
+            // new
+            bars.enter()
+                .append("rect")
+                .attr("class", "bar stack" + groupIndex)
+                .attr("x", function(data, dataIndex){return barX(this, data, groupIndex, dataIndex);})
+                .attr("y", chart.xAxisY())
+                .attr("width", barWidth);
+            dc.transition(bars, chart.transitionDuration())
+                .attr("y", function(data, dataIndex) {
+                    return barY(this, data, dataIndex);
+                })
+                .attr("height", barHeight);
+
+            // update
+            dc.transition(bars, chart.transitionDuration())
+                .attr("y", function(data, dataIndex) {
+                    return barY(this, data, dataIndex);
+                })
+                .attr("height", barHeight);
+
+            // delete
+            dc.transition(bars.exit(), chart.transitionDuration())
+                .attr("y", chart.xAxisY())
+                .attr("height", 0);
+        }
     };
+
+    function precalculateBarPosition(groups) {
+        for (var groupIndex = 0; groupIndex < groups.length; ++groupIndex) {
+            var data = groups[groupIndex].all();
+            _barPositionMatrix[groupIndex] = [];
+            for (var dataIndex = 0; dataIndex < data.length; ++dataIndex) {
+                var d = data[dataIndex];
+                if (groupIndex == 0)
+                    _barPositionMatrix[groupIndex][dataIndex] = barBaseline() - barHeight(d);
+                else
+                    _barPositionMatrix[groupIndex][dataIndex] = _barPositionMatrix[groupIndex - 1][dataIndex] - barHeight(d);
+            }
+        }
+    }
+
+    function barBaseline() {
+        return chart.margins().top + chart.yAxisHeight() - BAR_PADDING_BOTTOM;
+    }
 
     function barWidth(d) {
         var numberOfBars = chart.xUnits()(chart.x().domain()[0], chart.x().domain()[1]).length + BAR_PADDING_WIDTH;
@@ -856,12 +906,16 @@ dc.barChart = function(parent) {
         return w;
     }
 
-    function barX(d) {
-        return chart.x()(chart.keyRetriever()(d)) + chart.margins().left;
+    function barX(bar, data, groupIndex, dataIndex) {
+        // cache group index in each individual bar to avoid timing issue introduced by transition
+        bar[GROUP_INDEX_NAME] = groupIndex;
+        return chart.x()(chart.keyRetriever()(data)) + chart.margins().left;
     }
 
-    function barY(d) {
-        return chart.margins().top + chart.y()(chart.valueRetriever()(d));
+    function barY(bar, data, dataIndex) {
+        // cached group index can then be safely retrieved from bar wo/ worrying about transition
+        var groupIndex = bar[GROUP_INDEX_NAME];
+        return _barPositionMatrix[groupIndex][dataIndex];
     }
 
     function barHeight(d) {
@@ -887,10 +941,51 @@ dc.barChart = function(parent) {
         }
     };
 
-    chart.stack = function(_){
-        if(!arguments.length) return _stack;
+    chart.stack = function(_) {
+        if (!arguments.length) return _stack;
         _stack = _;
         return chart;
+    };
+
+    // override y axis domain calculation to include stacked groups
+    function combineAllGroups() {
+        var allGroups = [];
+
+        allGroups.push(chart.group());
+
+        for (var i = 0; i < chart.stack().length; ++i)
+            allGroups.push(chart.stack()[i]);
+
+        return allGroups;
+    }
+
+    chart.yAxisMin = function() {
+        var min = 0;
+        var allGroups = combineAllGroups();
+
+        for (var i = 0; i < allGroups.length; ++i) {
+            var group = allGroups[i];
+            var m = d3.min(group.all(), function(e) {
+                return chart.valueRetriever()(e);
+            });
+            if (m < min) min = m;
+        }
+
+        return min;
+    };
+
+    chart.yAxisMax = function() {
+        var max = 0;
+        var allGroups = combineAllGroups();
+
+        for (var i = 0; i < allGroups.length; ++i) {
+            var group = allGroups[i];
+            max += d3.max(group.all(), function(e) {
+                return chart.valueRetriever()(e);
+            });
+        }
+
+        return max;
     };
 
     return chart.anchor(parent);
