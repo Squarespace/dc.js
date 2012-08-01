@@ -1,48 +1,135 @@
-dc.singleSelectionChart = function(chart) {
-    var SELECTED_CLASS = "selected";
-    var DESELECTED_CLASS = "deselected";
+dc.singleSelectionChart = function(chart, hierarchical) {
+	var SELECTED_CLASS = "selected";
+	var DESELECTED_CLASS = "deselected";
 
-    var _filter;
+	chart.highlightSelected = function(e) {
+		d3.select(e).classed(SELECTED_CLASS, true);
+		d3.select(e).classed(DESELECTED_CLASS, false);
+	};
 
-    chart.hasFilter = function() {
-        return _filter != null;
-    };
+	chart.fadeDeselected = function(e) {
+		d3.select(e).classed(SELECTED_CLASS, false);
+		d3.select(e).classed(DESELECTED_CLASS, true);
+	};
 
-    chart.filter = function(f) {
-        if (!arguments.length) return _filter;
+	chart.resetHighlight = function(e) {
+		d3.select(e).classed(SELECTED_CLASS, false);
+		d3.select(e).classed(DESELECTED_CLASS, false);
+	};
 
-        _filter = f;
+	// Non-hierarchical chart, the default type, has simple filter as other
+	// chart types do.
+	if (!hierarchical) {
+		var _filter = null;
 
-        if (chart.dataAreSet())
-            chart.dimension().filter(_filter);
+		chart.hasFilter = function() {
+			return _filter != null;
+		};
 
-        if (f) {
-            chart.turnOnControls();
-        } else {
-            chart.turnOffControls();
-        }
+		chart.filter = function(f) {
+			if (!arguments.length)
+				return _filter;
 
-        return chart;
-    };
+			_filter = f;
 
-    chart.currentFilter = function() { 
-       return _filter;
-    };
+			if (chart.dataAreSet())
+				chart.dimension().filter(_filter);
 
-    chart.highlightSelected = function(e) {
-        d3.select(e).classed(SELECTED_CLASS, true);
-        d3.select(e).classed(DESELECTED_CLASS, false);
-    }
+			if (f) {
+				chart.turnOnControls();
+			} else {
+				chart.turnOffControls();
+			}
 
-    chart.fadeDeselected = function(e) {
-        d3.select(e).classed(SELECTED_CLASS, false);
-        d3.select(e).classed(DESELECTED_CLASS, true);
-    }
+			return chart;
+		};
+	}
+	// hierarchical charts have an array of filters, dimensions, and groups.
+	else {
+		var _dimensions = [];
+		var _groups = [];
+		var _filters = [];
 
-    chart.resetHighlight = function(e) {
-        d3.select(e).classed(SELECTED_CLASS, false);
-        d3.select(e).classed(DESELECTED_CLASS, false);
-    }
+		var _latestFilter = function() {
+			return _filters.length > 0 ? _filters[_filters.length - 1] : null;
+		};
 
-    return chart;
+		chart.filterText = function() {
+			var strings = new Array();
+			for ( var i = 0; i < _filters.length; i++) {
+				strings.push(chart.filterPrinter()(_filters[i]));
+			}
+			return strings.join(" >> ");
+		};
+
+		chart.hasFilter = function() {
+			return _filters.length == _dimensions.length;
+		};
+
+		chart.filter = function(f) {
+			if (!arguments.length)
+				return _latestFilter();
+
+			if (f != undefined) {
+				if (chart.dataAreSet())
+					chart.dimension().filter(f);
+				if (_filters.length < _dimensions.length) {
+					_filters.push(f);
+				} else
+					_filters[_filters.length - 1] = f;
+			} else {
+				var dim = chart.dimension();
+				if (chart.dataAreSet())
+					dim.filter(f);
+				if (_filters.length > 0) {
+					_filters.pop();
+				}
+			}
+
+			if (_filters.length > 0) {
+				chart.turnOnControls();
+			} else {
+				chart.turnOffControls();
+			}
+
+			return chart;
+		};
+
+		chart.popFilter = function() {
+			chart.filter(null);
+			return chart;
+		};
+
+		chart.filterAll = function() {
+			while (_filters.length > 0) {
+				chart.filter(null);
+			}
+			chart.dimension().filter(null);
+		};
+
+		chart.dimension = function() {
+			if (arguments.length) {
+				throw "Cannot call dimension() with argument, must call addDimensionAndGroup(d, g)";
+			}
+			return (_dimensions.length == 0) ? null : _dimensions[Math.min(
+					_filters.length, _dimensions.length - 1)];
+		};
+
+		chart.group = function() {
+			if (arguments.length) {
+				throw "Cannot call group() with argument, must call addDimensionAndGroup(d, g)";
+			}
+			return (_groups.length == 0) ? null : _groups[Math.min(
+					_filters.length, _groups.length - 1)];
+		};
+
+		chart.addDimensionAndGroup = function(d, g) {
+			_dimensions.push(d);
+			_groups.push(g);
+			return chart;
+		};
+
+	}
+
+	return chart;
 };

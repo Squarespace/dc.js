@@ -1,9 +1,9 @@
-dc.bubbleChart = function(selector) {
+dc.bubbleChart = function(selector, hierarchical) {
     var NODE_CLASS = "node";
     var BUBBLE_CLASS = "bubble";
     var MIN_RADIUS = 10;
 
-    var chart = dc.singleSelectionChart(dc.colorChart(dc.coordinateGridChart({})));
+    var chart = dc.singleSelectionChart(dc.colorChart(dc.coordinateGridChart({})), hierarchical);
 
     chart.renderLabel(true);
     chart.renderTitle(false);

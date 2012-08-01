@@ -144,7 +144,7 @@ dc.baseChart = function(chart) {
     };
 
     chart.orderedGroup = function() {
-        return _group.order(function(p) {
+        return chart.group().order(function(p) {
             return p.key;
         });
     };
@@ -154,7 +154,7 @@ dc.baseChart = function(chart) {
     };
 
     chart.dataAreSet = function() {
-        return _dimension != undefined && _group != undefined;
+        return chart.dimension() != undefined && chart.group() != undefined;
     };
 
     chart.select = function(s) {
@@ -219,15 +219,19 @@ dc.baseChart = function(chart) {
         _filterPrinter = _;
         return chart;
     };
+    
+    chart.filterText = function() {
+    	return chart.filterPrinter()(chart.filter());
+    };
 
     chart.turnOnControls = function() {
         chart.select("a.reset").style("display", null);
-        chart.select(".filter").text(_filterPrinter(chart.filter())).style("display", null);
+        chart.select(".filter").text(chart.filterText()).style("display", null);
     };
 
     chart.turnOffControls = function() {
         chart.select("a.reset").style("display", "none");
-        chart.select(".filter").style("display", "none").text(chart.filter());
+        chart.select(".filter").style("display", "none").text(chart.filterText());
     };
 
     chart.transitionDuration = function(d) {
@@ -574,55 +578,142 @@ dc.colorChart = function(chart) {
 
     return chart;
 };
-dc.singleSelectionChart = function(chart) {
-    var SELECTED_CLASS = "selected";
-    var DESELECTED_CLASS = "deselected";
+dc.singleSelectionChart = function(chart, hierarchical) {
+	var SELECTED_CLASS = "selected";
+	var DESELECTED_CLASS = "deselected";
 
-    var _filter;
+	chart.highlightSelected = function(e) {
+		d3.select(e).classed(SELECTED_CLASS, true);
+		d3.select(e).classed(DESELECTED_CLASS, false);
+	};
 
-    chart.hasFilter = function() {
-        return _filter != null;
-    };
+	chart.fadeDeselected = function(e) {
+		d3.select(e).classed(SELECTED_CLASS, false);
+		d3.select(e).classed(DESELECTED_CLASS, true);
+	};
 
-    chart.filter = function(f) {
-        if (!arguments.length) return _filter;
+	chart.resetHighlight = function(e) {
+		d3.select(e).classed(SELECTED_CLASS, false);
+		d3.select(e).classed(DESELECTED_CLASS, false);
+	};
 
-        _filter = f;
+	// Non-hierarchical chart, the default type, has simple filter as other
+	// chart types do.
+	if (!hierarchical) {
+		var _filter = null;
 
-        if (chart.dataAreSet())
-            chart.dimension().filter(_filter);
+		chart.hasFilter = function() {
+			return _filter != null;
+		};
 
-        if (f) {
-            chart.turnOnControls();
-        } else {
-            chart.turnOffControls();
-        }
+		chart.filter = function(f) {
+			if (!arguments.length)
+				return _filter;
 
-        return chart;
-    };
+			_filter = f;
 
-    chart.currentFilter = function() { 
-       return _filter;
-    };
+			if (chart.dataAreSet())
+				chart.dimension().filter(_filter);
 
-    chart.highlightSelected = function(e) {
-        d3.select(e).classed(SELECTED_CLASS, true);
-        d3.select(e).classed(DESELECTED_CLASS, false);
-    }
+			if (f) {
+				chart.turnOnControls();
+			} else {
+				chart.turnOffControls();
+			}
 
-    chart.fadeDeselected = function(e) {
-        d3.select(e).classed(SELECTED_CLASS, false);
-        d3.select(e).classed(DESELECTED_CLASS, true);
-    }
+			return chart;
+		};
+	}
+	// hierarchical charts have an array of filters, dimensions, and groups.
+	else {
+		var _dimensions = [];
+		var _groups = [];
+		var _filters = [];
 
-    chart.resetHighlight = function(e) {
-        d3.select(e).classed(SELECTED_CLASS, false);
-        d3.select(e).classed(DESELECTED_CLASS, false);
-    }
+		var _latestFilter = function() {
+			return _filters.length > 0 ? _filters[_filters.length - 1] : null;
+		};
 
-    return chart;
+		chart.filterText = function() {
+			var strings = new Array();
+			for ( var i = 0; i < _filters.length; i++) {
+				strings.push(chart.filterPrinter()(_filters[i]));
+			}
+			return strings.join(" >> ");
+		};
+
+		chart.hasFilter = function() {
+			return _filters.length == _dimensions.length;
+		};
+
+		chart.filter = function(f) {
+			if (!arguments.length)
+				return _latestFilter();
+
+			if (f != undefined) {
+				if (chart.dataAreSet())
+					chart.dimension().filter(f);
+				if (_filters.length < _dimensions.length) {
+					_filters.push(f);
+				} else
+					_filters[_filters.length - 1] = f;
+			} else {
+				var dim = chart.dimension();
+				if (chart.dataAreSet())
+					dim.filter(f);
+				if (_filters.length > 0) {
+					_filters.pop();
+				}
+			}
+
+			if (_filters.length > 0) {
+				chart.turnOnControls();
+			} else {
+				chart.turnOffControls();
+			}
+
+			return chart;
+		};
+
+		chart.popFilter = function() {
+			chart.filter(null);
+			return chart;
+		};
+
+		chart.filterAll = function() {
+			while (_filters.length > 0) {
+				chart.filter(null);
+			}
+			chart.dimension().filter(null);
+		};
+
+		chart.dimension = function() {
+			if (arguments.length) {
+				throw "Cannot call dimension() with argument, must call addDimensionAndGroup(d, g)";
+			}
+			return (_dimensions.length == 0) ? null : _dimensions[Math.min(
+					_filters.length, _dimensions.length - 1)];
+		};
+
+		chart.group = function() {
+			if (arguments.length) {
+				throw "Cannot call group() with argument, must call addDimensionAndGroup(d, g)";
+			}
+			return (_groups.length == 0) ? null : _groups[Math.min(
+					_filters.length, _groups.length - 1)];
+		};
+
+		chart.addDimensionAndGroup = function(d, g) {
+			_dimensions.push(d);
+			_groups.push(g);
+			return chart;
+		};
+
+	}
+
+	return chart;
 };
-dc.pieChart = function(selector) {
+dc.pieChart = function(selector, hierarchical) {
     var sliceCssClass = "pie-slice";
 
     var radius = 0, innerRadius = 0;
@@ -631,12 +722,13 @@ dc.pieChart = function(selector) {
 
     var arc;
     var dataPie;
+    var dataPieDimension;
     var slices;
     var slicePaths;
 
     var labels;
 
-    var chart = dc.singleSelectionChart(dc.colorChart(dc.baseChart({})));
+    var chart = dc.singleSelectionChart(dc.colorChart(dc.baseChart({})), hierarchical);
 
     chart.label(function(d) {
         return chart.keyRetriever()(d.data);
@@ -658,6 +750,7 @@ dc.pieChart = function(selector) {
                 .attr("transform", "translate(" + chart.cx() + "," + chart.cy() + ")");
 
             dataPie = calculateDataPie();
+            dataPieDimension = chart.dimension();
 
             arc = chart.buildArcs();
 
@@ -758,6 +851,8 @@ dc.pieChart = function(selector) {
     };
 
     chart.redraw = function() {
+    	if ( dataPieDimension !== chart.dimension() )
+    		return chart.render();
         chart.highlightFilter();
         var data = dataPie(chart.orderedGroup().top(Infinity));
         slicePaths = slicePaths.data(data);
@@ -1144,12 +1239,12 @@ dc.dataTable = function(selector) {
 
     return chart.anchor(selector);
 };
-dc.bubbleChart = function(selector) {
+dc.bubbleChart = function(selector, hierarchical) {
     var NODE_CLASS = "node";
     var BUBBLE_CLASS = "bubble";
     var MIN_RADIUS = 10;
 
-    var chart = dc.singleSelectionChart(dc.colorChart(dc.coordinateGridChart({})));
+    var chart = dc.singleSelectionChart(dc.colorChart(dc.coordinateGridChart({})), hierarchical);
 
     chart.renderLabel(true);
     chart.renderTitle(false);

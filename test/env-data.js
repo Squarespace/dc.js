@@ -66,12 +66,26 @@ dateGroup = dateDimension.group();
 dateValueSumGroup = dateDimension.group().reduceSum(function(d){return d.value;});
 dateIdSumGroup = dateDimension.group().reduceSum(function(d){return d.id;});
 
+countryDimensionForHierarchy = data.dimension(function(d) {
+    return d.countrycode;
+});
+
+countryDimensionForHierarchyGroup = countryDimensionForHierarchy.group();
+
+regionDimensionForHierarchy = data.dimension(function(d) {
+    return d.region;
+});
+
+regionDimensionForHierarchyGroup = regionDimensionForHierarchy.group();
+
 resetAllFilters = function() {
     valueDimension.filterAll();
     countryDimension.filterAll();
     statusDimension.filterAll();
     regionDimension.filterAll();
     dateDimension.filterAll();
+    countryDimensionForHierarchy.filterAll();
+    regionDimensionForHierarchy.filterAll();
 };
 
 resetBody = function(){

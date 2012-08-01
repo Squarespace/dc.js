@@ -1,4 +1,4 @@
-dc.pieChart = function(selector) {
+dc.pieChart = function(selector, hierarchical) {
     var sliceCssClass = "pie-slice";
 
     var radius = 0, innerRadius = 0;
@@ -7,12 +7,13 @@ dc.pieChart = function(selector) {
 
     var arc;
     var dataPie;
+    var dataPieDimension;
     var slices;
     var slicePaths;
 
     var labels;
 
-    var chart = dc.singleSelectionChart(dc.colorChart(dc.baseChart({})));
+    var chart = dc.singleSelectionChart(dc.colorChart(dc.baseChart({})), hierarchical);
 
     chart.label(function(d) {
         return chart.keyRetriever()(d.data);
@@ -34,6 +35,7 @@ dc.pieChart = function(selector) {
                 .attr("transform", "translate(" + chart.cx() + "," + chart.cy() + ")");
 
             dataPie = calculateDataPie();
+            dataPieDimension = chart.dimension();
 
             arc = chart.buildArcs();
 
@@ -134,6 +136,8 @@ dc.pieChart = function(selector) {
     };
 
     chart.redraw = function() {
+    	if ( dataPieDimension !== chart.dimension() )
+    		return chart.render();
         chart.highlightFilter();
         var data = dataPie(chart.orderedGroup().top(Infinity));
         slicePaths = slicePaths.data(data);

@@ -42,7 +42,7 @@ dc.baseChart = function(chart) {
     };
 
     chart.orderedGroup = function() {
-        return _group.order(function(p) {
+        return chart.group().order(function(p) {
             return p.key;
         });
     };
@@ -52,7 +52,7 @@ dc.baseChart = function(chart) {
     };
 
     chart.dataAreSet = function() {
-        return _dimension != undefined && _group != undefined;
+        return chart.dimension() != undefined && chart.group() != undefined;
     };
 
     chart.select = function(s) {
@@ -117,15 +117,19 @@ dc.baseChart = function(chart) {
         _filterPrinter = _;
         return chart;
     };
+    
+    chart.filterText = function() {
+    	return chart.filterPrinter()(chart.filter());
+    };
 
     chart.turnOnControls = function() {
         chart.select("a.reset").style("display", null);
-        chart.select(".filter").text(_filterPrinter(chart.filter())).style("display", null);
+        chart.select(".filter").text(chart.filterText()).style("display", null);
     };
 
     chart.turnOffControls = function() {
         chart.select("a.reset").style("display", "none");
-        chart.select(".filter").style("display", "none").text(chart.filter());
+        chart.select(".filter").style("display", "none").text(chart.filterText());
     };
 
     chart.transitionDuration = function(d) {

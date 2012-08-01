@@ -148,6 +148,14 @@
     <div class="clear"></div>
 </div>
 
+<div id="pie-chart-hierarchy" class="chart">
+    <span>Country/Region PieChart</span>
+    <a class="reset" href="javascript:pieChartHierarchy.filterAll();dc.redrawAll();" style="display: none;">reset</a>
+    <br/>Current filter: <span class="filter"></span>
+
+    <div class="clear"></div>
+</div>
+
 <div class="clear"></div>
 
 <div id="line-chart-date" class="chart">
@@ -220,6 +228,15 @@
             .dimension(countryDimension)
             .group(countryGroup)
             .renderTitle(true);
+
+   var pieChartHierarchy = dc.pieChart("#pie-chart-hierarchy", true)
+            .width(250)
+            .height(250)
+            .radius(100)
+            .renderTitle(true)
+            .addDimensionAndGroup(countryDimensionForHierarchy, countryDimensionForHierarchyGroup)
+            .addDimensionAndGroup(regionDimensionForHierarchy, regionDimensionForHierarchyGroup)
+            ;
 
     var lineChartDate1 = dc.lineChart("#line-chart-date");
     lineChartDate1.width(500)
