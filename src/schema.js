@@ -71,7 +71,7 @@ dc.schema = function() {
 	    // exclude under certain conditions
 	    if ( EXCLUDED_PROPERTIES[propname] ) 
 	        continue;
-	    if ( fm.type == "string" && 
+	    if ( fm.type == "string" && (!ATTRIBUTION_PROPERTIES[propname]) &&
 	         ( fm.cardinality > STRING_CARDINALITY_THRESHOLD || 
 		   fm.cardinality / data.length > STRING_CARDINALITY_PCT_THRESHOLD ) )
 	        continue;

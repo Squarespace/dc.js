@@ -190,7 +190,7 @@ dc.schema = function() {
 	    // exclude under certain conditions
 	    if ( EXCLUDED_PROPERTIES[propname] ) 
 	        continue;
-	    if ( fm.type == "string" && 
+	    if ( fm.type == "string" && (!ATTRIBUTION_PROPERTIES[propname]) &&
 	         ( fm.cardinality > STRING_CARDINALITY_THRESHOLD || 
 		   fm.cardinality / data.length > STRING_CARDINALITY_PCT_THRESHOLD ) )
 	        continue;
@@ -968,12 +968,13 @@ dc.singleSelectionChart = function(chart, hierarchical) {
 				} else
 					_filters[_filters.length - 1] = f;
 			} else {
-				var dim = chart.dimension();
 				if (chart.dataAreSet())
-					dim.filter(f);
+				    chart.dimension().filter(f);
 				if (_filters.length > 0) {
-					_filters.pop();
+				    _filters.pop();
 				}
+				if (chart.dataAreSet())
+				    chart.dimension().filter(f);
 			}
 
 			if (_filters.length > 0) {
@@ -994,7 +995,6 @@ dc.singleSelectionChart = function(chart, hierarchical) {
 			while (_filters.length > 0) {
 				chart.filter(null);
 			}
-			chart.dimension().filter(null);
 		};
 
 		chart.dimension = function() {
