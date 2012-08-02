@@ -28,6 +28,8 @@
             <file file="src/core.js"/>
             <file file="src/utils.js"/>
             <file file="src/schema.js"/>
+            <file file="src/chart-strategy.js"/>
+            <file file="src/chart-builder.js"/>
             <file file="src/base-chart.js"/>
             <file file="src/coordinate-grid-chart.js"/>
             <file file="src/color-chart.js"/>

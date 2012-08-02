@@ -119,13 +119,175 @@ dc.printers.filter = function(filter) {
 
 dc.schema = function() {
 
-    var PIE_THRESHOLD = 10;
-    var ATTRIBUTION_PROPERTIES = { 'channel': 1, 'subchannel': 2, 'source': 3, 'campaign': 4, 'subcampaign': 5 };
-    var EXCLUDED_PROPERTIES = { 'coupon_ids' : true };
-    var STRING_CARDINALITY_THRESHOLD = 200;
-    var STRING_CARDINALITY_PCT_THRESHOLD = .9;;
+    var CARDINALITY_THRESHOLD_TO_PRESERVE_VALUES = 20;
 
-    var VALUE_ACCESSORS = {
+    var DATE_FORMATS = [
+	d3.time.format.iso,
+	d3.time.format("%Y-%m-%d %H:%M:%S"),
+	d3.time.format("%Y-%m-%d"),
+	d3.time.format("%m-%d-%Y %H:%M:%S"),
+	d3.time.format("%m-%d-%Y"),
+	d3.time.format("%m-%d-%Y %H:%M:%S")
+    ];
+
+    var parsePossibleDate = function(v) {
+        for ( var i = 0; i < DATE_FORMATS.length; i++ ) {
+	    var val = DATE_FORMATS[i].parse(v);
+	    if ( val != null ) { return val; }
+	}
+	return null;
+    };
+
+
+    var schema = {};
+
+    schema.coerceData = function(data, metadata) {
+        // find all properies whose type is 'date'.
+	var dateprops = {};
+	for ( var name in metadata.properties ) {
+	    if ( metadata.properties[name].type == "date" ) {
+	        dateprops[name] = true;
+		var md = metadata.properties[name]; 
+		if ( md.minimum != null ) { 
+		    md.minimum = parsePossibleDate(md.minimum);
+		}
+		if ( md.maximum != null ) {
+		    md.maximum = parsePossibleDate(md.maximum);
+		}
+		
+	    }
+	}
+	if ( ! dateprops ) { return; }
+	for ( var i=0; i < data.length; i++ ) {
+	    var d = data[i];
+	    for ( var k in d ) {
+	        if (  dateprops[k] ) {
+		    d[k] = parsePossibleDate(d[k]);
+		}
+	    }
+	}
+    };
+
+    var newFieldMetadata = function() { return { "required": true, "cardinality": 0 }; };
+
+    var determineDataType = function(v, currentType, coerce) {
+	var thisType = "unknown";
+	var v_typeof = typeof(v);
+	var coercedValue = v;
+	var wasCoerced = false;
+        if ( v_typeof == "string" ) {
+	    var pdate = parsePossibleDate(v);
+	    if ( pdate != null ) {
+		thisType = "date";
+		if ( coerce ) {
+		    coercedValue = pdate;
+		    wasCoerced = true;
+		}
+	    }
+	    else
+	        thisType = "string";
+	}
+	else if ( v_typeof == "number" ) 
+	    thisType = "number";
+	else if ( v_typeof == "integer" ) 
+	    thisType = "integer";
+	else if ( v_typeof == "boolean" ) 
+	    thisType = "boolean";
+	else if ( v.getMonth === "function" )
+	    thisType = "date";
+	
+	if ( currentType != null && thisType != currentType ) {
+	    if ( thisType == "number" && currentType == "integer" ) 
+	        return "number";
+	    if ( thisType == "integer" && currentType == "number" ) 
+	        return "number";
+	    if ( thisType == "date" && currentType == "string" ) 
+	        return "string";
+	    else
+	        return "mixed";
+	}
+	else
+	    return  { 'type' : thisType, 'coercedValue' : coercedValue, 'wasCoerced' : wasCoerced };
+    };
+
+    var objectSize = function(obj) {
+        var size = 0;
+	for ( var k in obj ) {
+	    if ( obj.hasOwnProperty(k) ) size++;
+	}
+	return size;
+    };
+
+    schema.getMetadata = function(data, coerce) {
+        var metadata = {};
+	var props = {};
+	metadata['properties'] = props;
+
+	for ( var i = 0; i < data.length; i++ ) {
+	    var item = data[i];
+	    for ( var k in item ) {
+	        var val = item[k];
+		var fmd = props[k];
+		if ( fmd == null ) {
+		    fmd = newFieldMetadata();
+		    props[k] = fmd;
+		}
+		if ( val == null ) {
+		    fmd.required = false;
+		}
+		else {
+		    var currentType = fmd.type;
+		    var thisType = determineDataType(val, currentType, coerce);
+		    if ( currentType == null ) 
+		        fmd.type = thisType.type;
+	            else if ( thisType.type != currentType ) 
+		        fmd.type = "mixed";
+		    if ( thisType.wasCoerced ) {
+			val = thisType.coercedValue;
+			item[k] = val;
+		    }
+		}
+
+		var uniqs = fmd.values;
+		if ( uniqs == null ) {
+		    uniqs = {};
+		    fmd.values = uniqs;
+		}
+		// val coerced to string for key, but kept intact for value.
+		if ( uniqs[val] === undefined ) 
+		    fmd.cardinality++;
+		    uniqs[ val ] = val;
+		// max and min.
+		if ( fmd.minimum === undefined || val < fmd.minimum ) 
+		    fmd.minimum = val;
+		if ( fmd.maximum === undefined || val > fmd.maximum ) 
+		    fmd.maximum = val;
+	    }
+	}
+
+	for ( var fname in props ) {
+	    var fmd = props[fname];
+	    if ( fmd.cardinality >  CARDINALITY_THRESHOLD_TO_PRESERVE_VALUES ) {
+		    delete fmd.values;
+	    }
+	}
+
+	return metadata;
+    };
+
+    return schema;
+}();
+dc.chartStrategy = function() {
+
+    var chartStrategy = {};
+
+    chartStrategy.PIE_THRESHOLD = 10;
+    chartStrategy.ATTRIBUTION_PROPERTIES = { 'channel': 1, 'subchannel': 2, 'source': 3, 'campaign': 4, 'subcampaign': 5 };
+    chartStrategy.EXCLUDED_PROPERTIES = { 'coupon_ids' : true };
+    chartStrategy.STRING_CARDINALITY_THRESHOLD = 200;
+    chartStrategy.STRING_CARDINALITY_PCT_THRESHOLD = .9;;
+
+    chartStrategy.VALUE_ACCESSORS = {
         "standard": function(name) { return function(d) { return d[name]; } },
         "day": function(name) { return function(d) { 
 		return d3.time.day(d[name]); 
@@ -134,7 +296,7 @@ dc.schema = function() {
         "hour": function(name) { return function(d) { return d[name] ? d[name].getHours() : null; } }
     };
 
-    var _computeDateDomain = function(minDate, maxDate) {
+    var computeDateDomain = function(minDate, maxDate) {
 	var start = new Date(minDate.getTime());
 	start.setHours(0);
 	start.setMinutes(0);
@@ -148,36 +310,7 @@ dc.schema = function() {
 	return [ start, end ];
     };
 
-    var parseDate = d3.time.format("%Y-%m-%d %H:%M:%S").parse;
-
-    var schema = {};
-
-    schema.coerceData = function(data, metadata) {
-        // find all properies whose type is 'date'.
-	var dateprops = {};
-	for ( var name in metadata.properties ) {
-	    if ( metadata.properties[name].type == "date" ) {
-	        dateprops[name] = true;
-		var md = metadata.properties[name]; if ( md.minimum != null ) { md.minimum = parseDate(md.minimum);
-		}
-		if ( md.maximum != null ) {
-		    md.maximum = parseDate(md.maximum);
-		}
-		
-	    }
-	}
-	if ( ! dateprops ) { return; }
-	for ( var i=0; i < data.length; i++ ) {
-	    var d = data[i];
-	    for ( var k in d ) {
-	        if (  dateprops[k] ) {
-		    d[k] = parseDate(d[k]);
-		}
-	    }
-	}
-    };
-
-    schema.chartSuggestions = function(data, metadata) {
+    chartStrategy.getStrategy = function(data, metadata) {
         // given the metadata, make dimensions and groups.
 	var charts = {};
 
@@ -188,22 +321,22 @@ dc.schema = function() {
 	    var fm = metadata.properties[propname];
 
 	    // exclude under certain conditions
-	    if ( EXCLUDED_PROPERTIES[propname] ) 
+	    if ( chartStrategy.EXCLUDED_PROPERTIES[propname] ) 
 	        continue;
-	    if ( fm.type == "string" && (!ATTRIBUTION_PROPERTIES[propname]) &&
-	         ( fm.cardinality > STRING_CARDINALITY_THRESHOLD || 
-		   fm.cardinality / data.length > STRING_CARDINALITY_PCT_THRESHOLD ) )
+	    if ( fm.type == "string" && (!chartStrategy.ATTRIBUTION_PROPERTIES[propname]) &&
+	         ( fm.cardinality > chartStrategy.STRING_CARDINALITY_THRESHOLD || 
+		   fm.cardinality / data.length > chartStrategy.STRING_CARDINALITY_PCT_THRESHOLD ) )
 	        continue;
 
 	    // chart type
 	    var chart_type;
 	    if ( fm.type == "date" || 
-	         ( fm.type != "string" && !(ATTRIBUTION_PROPERTIES[propname]) && fm.cardinality > PIE_THRESHOLD ) ) {
+	         ( fm.type != "string" && 
+		   !(chartStrategy.ATTRIBUTION_PROPERTIES[propname]) && 
+		   fm.cardinality > chartStrategy.PIE_THRESHOLD ) ) 
 	        chart_type = "bar";
-	    }
-	    else {
+	    else 
 	        chart_type = "pie";
-	    }
 
 	    // value accessor and dimension
 	    // domain/scale, etc.
@@ -212,19 +345,19 @@ dc.schema = function() {
 	    var domainUnits = null;
 	    var round = null;
 	    if ( fm.type == "date" ) {
-	        value_accessor = VALUE_ACCESSORS.day(propname);
-		domain = d3.time.scale().domain(_computeDateDomain(fm.minimum, fm.maximum));
+	        value_accessor = chartStrategy.VALUE_ACCESSORS.day(propname);
+		domain = d3.time.scale().domain(computeDateDomain(fm.minimum, fm.maximum));
 		domainUnits = d3.time.days;
 		round = d3.time.day.round;
 	    }
 	    else if ( chart_type == "bar" ) {
-	        value_accessor = VALUE_ACCESSORS.standard(propname);
+	        value_accessor = chartStrategy.VALUE_ACCESSORS.standard(propname);
 		var max_domain = ( fm.type == "integer" || fm.type == "number" ) ?  fm.maximum + 1 : fm.maximum;
 		domain = d3.scale.linear().domain([fm.minimum, max_domain]);
 		round = dc.round.floor;
 	    }
 	    else {
-	        value_accessor = VALUE_ACCESSORS.standard(propname);
+	        value_accessor = chartStrategy.VALUE_ACCESSORS.standard(propname);
 	    } 
 
 	    // TODO group by sum, etc.
@@ -239,164 +372,195 @@ dc.schema = function() {
 		"field_metadata": fm
 	    };
 	}
-return charts;
+
+	return charts;
     };
 
-    schema.newCrossfilter = function(data, metadata, strategy) {
-        var crfilt = crossfilter(data);
-	var obj = { 
-	    "crossfilter": crfilt,
-	    "dimensions": {},
-	    "groups": {},
-	    "info": {}
-	};
+    return chartStrategy;
+}();
 
-	for ( var propname in strategy ) {
-	    var info = strategy[propname];
-	    var dim = crfilt.dimension(info.value_accessor);
-	    var grp = dim.group();
-	    obj.dimensions[propname] = dim;
-	    obj.groups[propname] = grp;
-	    obj.info[propname] = info;
-	}
 
-	return obj;
+dc.newCrossfilter = function(data, strategy) {
+    var crfilt = crossfilter(data);
+    var obj = { 
+        "crossfilter": crfilt,
+        "dimensions": {}, 
+        "groups": {}, 
+        "info": {}
+    };  
 
+    for ( var propname in strategy ) { 
+        var info = strategy[propname];
+        var dim = crfilt.dimension(info.value_accessor);
+        var grp = dim.group();
+        obj.dimensions[propname] = dim;
+        obj.groups[propname] = grp;
+        obj.info[propname] = info;
+    }   
+
+    return obj;
+};  
+
+dc.chartBuilder = function() {
+
+    var chartBuilder = {
+	"defaultMargins" : {top: 10, right: 50, bottom: 30, left: 40},
+	"defaultHeight" : 100,
+	"defaultWidth" : 900,
+	"defaultTransition" : 300,
+	"defaultPieSize" : 180,
+	"defaultPieRadius": 80,
+	"defaultPieInnerRadius": 20
     };
 
-    var defaultChartDivBuilder = function(div, chart_info) {
+    chartBuilder.chartDivBuilder = function(div, chart_info) {
         var title = div.append("div").classed("title", true).text(chart_info.field_name);
 	title.append("span").classed("filter", true).style("display", "none")
 	if ( chart_info.hierarchical ) {
 	    title.append("span").classed("filter-pop", true)
 	        .attr("onclick", "dc.getChartFor(this).popFilter();dc.redrawAll();return true;")
-		.style("display", "none").text("pop");
+		.style("display", "none").text("back");
 	}
 	title.append("span").classed("reset", true)
 	    .attr("onclick", "dc.getChartFor(this).filterAll();dc.redrawAll();return true;")
 	    .style("display", "none").text("reset");
     };
 
-    schema.chartBuilder = function() {
-        var builder = {
-	    "defaultMargins" : {top: 10, right: 50, bottom: 30, left: 40},
-	    "defaultHeight" : 100,
-	    "defaultWidth" : 900,
-	    "defaultTransition" : 300,
-	    "defaultPieSize" : 180,
-	    "defaultPieRadius": 80,
-	    "defaultPieInnerRadius": 20
-	};
-	builder.build = function(selection, crossfilter_obj, chart_div_builder) {
-	    chart_div_builder = chart_div_builder || defaultChartDivBuilder;
+    chartBuilder.build = function(selection, crossfilter_obj) {
 
-	    var charts = {};
+	var charts = {};
 
-	    // collapse hierarchies into one composite.
-	    // only case handled so far is channel + et al.
-	    var hier = {};
-	    var hier_type = null;
-	    var hier_name = 'attribution';
-	    for ( var propname in crossfilter_obj.info ) {
-		if ( ! (propname in ATTRIBUTION_PROPERTIES) ) 
-		    continue;
-		if ( hier_type && crossfilter_obj.info[propname].type != hier_type )
-		    continue;
-		hier_type = crossfilter_obj.info[propname].type;
-		hier[propname] = crossfilter_obj.info[propname];
+	// collapse hierarchies into one composite.
+	// only case handled so far is channel + et al.
+	var hier = {};
+	var hier_type = null;
+	var hier_name = 'attribution';
+	for ( var propname in crossfilter_obj.info ) {
+	    if ( ! (propname in dc.chartStrategy.ATTRIBUTION_PROPERTIES) ) 
+		continue;
+	    if ( hier_type && crossfilter_obj.info[propname].type != hier_type )
+		continue;
+	    hier_type = crossfilter_obj.info[propname].type;
+	    hier[propname] = crossfilter_obj.info[propname];
+	}
+
+	if ( hier ) {
+	    var hlist = [];
+	    for ( propname in hier ) {
+		delete crossfilter_obj.info[propname];
+		hlist.push(hier[propname]);
 	    }
-
-	    if ( hier ) {
-		var hlist = [];
-		for ( propname in hier ) {
-		    delete crossfilter_obj.info[propname];
-		    hlist.push(hier[propname]);
-		}
-		hlist.sort(
-		    function(a,b) { 
-			var pa = ATTRIBUTION_PROPERTIES[a.field_name], pb = ATTRIBUTION_PROPERTIES[b.field_name]; 
-			return pa < pb ? -1 : ( pa > pb ? 1 : 0 ); 
-		    } 
-		);
-		crossfilter_obj.info[hier_name] = hlist;
-		var dims = [];
-		var grps = [];
-		for ( var i = 0; i < hlist.length; i++ ) {
-		    var info = hlist[i];
-		    dims.push(crossfilter_obj.dimensions[info.field_name]);
-		    grps.push(crossfilter_obj.groups[info.field_name]);
-		    delete crossfilter_obj.dimensions[info.field_name];
-		    delete crossfilter_obj.groups[info.field_name];
-		}
-		crossfilter_obj.dimensions[hier_name] = dims;
-		crossfilter_obj.groups[hier_name] = grps;
-		crossfilter_obj.info[hier_name] = hlist[0];
-		crossfilter_obj.info[hier_name].hierarchical = true;
+	    hlist.sort(
+		function(a,b) { 
+		    var pa = dc.chartStrategy.ATTRIBUTION_PROPERTIES[a.field_name], pb = dc.chartStrategy.ATTRIBUTION_PROPERTIES[b.field_name]; 
+		    return pa < pb ? -1 : ( pa > pb ? 1 : 0 ); 
+		} 
+	    );
+	    crossfilter_obj.info[hier_name] = hlist;
+	    var dims = [];
+	    var grps = [];
+	    for ( var i = 0; i < hlist.length; i++ ) {
+		var info = hlist[i];
+		dims.push(crossfilter_obj.dimensions[info.field_name]);
+		grps.push(crossfilter_obj.groups[info.field_name]);
+		delete crossfilter_obj.dimensions[info.field_name];
+		delete crossfilter_obj.groups[info.field_name];
 	    }
+	    crossfilter_obj.dimensions[hier_name] = dims;
+	    crossfilter_obj.groups[hier_name] = grps;
+	    crossfilter_obj.info[hier_name] = hlist[0];
+	    crossfilter_obj.info[hier_name].hierarchical = true;
+	}
 
-	    var propnames = [];
-	    for ( var propname in crossfilter_obj.info ) {
-	        propnames.push(propname);
+	var propnames = [];
+	for ( var propname in crossfilter_obj.info ) {
+	    propnames.push(propname);
+	}
+	propnames.sort(
+	    function(a,b) { 
+		var pa = crossfilter_obj.info[a].type; 
+		var pb = crossfilter_obj.info[b].type; 
+		return (pa < pb) ? -1 : ( pa > pb ? 1 : 0 ); 
 	    }
-	    propnames.sort(
-	        function(a,b) { 
-		    var pa = crossfilter_obj.info[a].type; 
-		    var pb = crossfilter_obj.info[b].type; 
-		    return (pa < pb) ? -1 : ( pa > pb ? 1 : 0 ); 
-		}
-            );
+	);
 
-	    for ( var i = 0; i < propnames.length; i++ ) {
-		var propname = propnames[i];
-		var info = crossfilter_obj.info[propname];
-		var selector = propname + "-chart";
-		if ( selection.select("#" + selector).empty() ) {
-		    var chart_div = selection.append("div").attr("id", selector)
-		        .classed("chart", true).classed(info.type + "-chart", true);
-		    chart_div_builder(chart_div, info);
-		}
-		var chart = null;
-		if ( info.type == "bar" ) {
-		    chart = dc.barChart("#" + selector)
-		    .width(builder.defaultWidth)
-		    .height(builder.defaultHeight)
-		    .transitionDuration(builder.defaultTransition)
-		    .margins(builder.defaultMargins)
-		    .dimension(crossfilter_obj.dimensions[propname])
-		    .group(crossfilter_obj.groups[propname])
-		    .elasticY(true)
-		    .x(info.domain)
-		    .round(info.round);
-		    if ( info.domainUnits ) { chart.xUnits(info.domainUnits); }
-		}
-		else if ( info.type == "pie" ) {
-		    var dim = crossfilter_obj.dimensions[propname];
-		    var grp = crossfilter_obj.groups[propname];
-		    chart = dc.pieChart("#" + selector, Array.isArray(dim))
-		    .width(builder.defaultPieSize)
-		    .height(builder.defaultPieSize)
-		    .radius(builder.defaultPieRadius)
-		    .innerRadius(builder.defaultPieInnerRadius)
-		    .transitionDuration(builder.defaultTransition)
-		    .renderTitle(true);
+	// the base charts div.
+	var charts_div = selection.select("#charts");
+	if ( charts_div.empty() )
+	    charts_div = selection.append("div").attr("id", "charts").classed("charts", true);
 
-		    if ( Array.isArray(dim) ) {
-		        for ( var j = 0; j < dim.length; j++ ) {
-			    chart.addDimensionAndGroup(dim[j], grp[j]);
-			}
-		    }
-		    else {
-			chart.dimension(dim).group(grp);
+	// put the charts in child divs.
+	for ( var i = 0; i < propnames.length; i++ ) {
+	    var propname = propnames[i];
+	    var info = crossfilter_obj.info[propname];
+	    var selector = propname + "-chart";
+	    if ( selection.select("#" + selector).empty() ) {
+		var chart_div = charts_div.append("div").attr("id", selector)
+		    .classed("chart", true).classed(info.type + "-chart", true);
+		chartBuilder.chartDivBuilder(chart_div, info);
+	    }
+	    var chart = null;
+	    if ( info.type == "bar" ) {
+		chart = dc.barChart("#" + selector)
+		.width(chartBuilder.defaultWidth)
+		.height(chartBuilder.defaultHeight)
+		.transitionDuration(chartBuilder.defaultTransition)
+		.margins(chartBuilder.defaultMargins)
+		.dimension(crossfilter_obj.dimensions[propname])
+		.group(crossfilter_obj.groups[propname])
+		.elasticY(true)
+		.x(info.domain)
+		.round(info.round);
+		if ( info.domainUnits ) { chart.xUnits(info.domainUnits); }
+	    }
+	    else if ( info.type == "pie" ) {
+		var dim = crossfilter_obj.dimensions[propname];
+		var grp = crossfilter_obj.groups[propname];
+		chart = dc.pieChart("#" + selector, Array.isArray(dim))
+		.width(chartBuilder.defaultPieSize)
+		.height(chartBuilder.defaultPieSize)
+		.radius(chartBuilder.defaultPieRadius)
+		.innerRadius(chartBuilder.defaultPieInnerRadius)
+		.transitionDuration(chartBuilder.defaultTransition)
+		.renderTitle(true);
+
+		if ( Array.isArray(dim) ) {
+		    for ( var j = 0; j < dim.length; j++ ) {
+			chart.addDimensionAndGroup(dim[j], grp[j]);
 		    }
 		}
-		charts[propname] = chart;
+		else {
+		    chart.dimension(dim).group(grp);
+		}
 	    }
-	    return charts;
-	};
-	return builder;
+	    charts[selector] = chart;
+	}
+
+	// a reset-all link
+	selection.append("div")
+	    .attr("id", "#reset-all").classed("reset", true)
+	    .attr("onclick", "dc.filterAll();dc.redrawAll();return true")
+	    .text("Reset all");
+
+	// a data-count
+	var dc_div = selection.append("div").attr("id", "data-count");
+	dc_div.append("span").classed("filter-count", true).text("-");
+	dc_div.append("span").text(" (");
+	dc_div.append("span").classed("filter-pct", true).text("-");
+	dc_div.append("span").text(") of ");
+	dc_div.append("span").classed("total-count", true).text("-");
+	dc_div.append("span").text(" items selected.");
+
+	charts['data-count'] = dc.dataCount("#data-count")
+	                         .dimension(crossfilter_obj.crossfilter)
+				 .group(crossfilter_obj.crossfilter.groupAll());
+
+	// TODO a data-table
+
+	return charts;
     };
 
-    return schema;
+    return chartBuilder;
 }();
 
 
