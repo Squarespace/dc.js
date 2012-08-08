@@ -14,7 +14,8 @@ dc.chartStrategy = function() {
 		return d3.time.day(d[name]); 
 	    } 
 	},
-        "hour": function(name) { return function(d) { return d[name] ? d[name].getHours() : null; } }
+        "hour": function(name) { return function(d) { return d[name] ? d[name].getHours() : null; } },
+        "weekday": function(name) { var names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']; return function(d) { return d[name] != null ? names[d[name].getDay()] : null;  };  }
     };
 
     var computeDateDomain = function(minDate, maxDate) {
@@ -72,6 +73,10 @@ dc.chartStrategy = function() {
 		domain = d3.scale.linear().domain([0,24]);
 		round = dc.round.floor;
 	    }
+	    else if ( fm.treatment == "weekday" && fm.type == "date" ) {
+		value_accessor = chartStrategy.VALUE_ACCESSORS.weekday(propname);
+		chart_type = "pie";
+	    }
 	    else if ( fm.type == "date" ) {
 		value_accessor = chartStrategy.VALUE_ACCESSORS.day(propname);
 		domain = d3.time.scale().domain(computeDateDomain(fm.minimum, fm.maximum));
@@ -117,13 +122,18 @@ dc.chartStrategy = function() {
 
 	    charts[propname] = chart_def;
 
-	    // for date fields, push a special _hour dimension.
+	    // for date fields, push a special _hour dimension. and a _weekday dimension.
 	    if ( fm.type == "date" ) {
 	        var hour_fm = cloneObject(fm);
 		hour_fm.treatment = 'hour';
 		var hour_chart_def = gfs(propname, hour_fm);
 		hour_chart_def.field_name = propname + "_hour";
 		charts[propname + "_hour"] = hour_chart_def;
+	        var wd_fm = cloneObject(fm);
+		wd_fm.treatment = 'weekday';
+		var wd_chart_def = gfs(propname, wd_fm);
+		wd_chart_def.field_name = propname + "_weekday";
+		charts[propname + "_weekday"] = wd_chart_def;
 	    }
 	}
 	return charts;
