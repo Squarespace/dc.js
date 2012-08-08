@@ -65,7 +65,7 @@ dc.schema = function() {
 		    wasCoerced = true;
 		}
 	    }
-	    else
+	    else 
 	        thisType = "string";
 	}
 	else if ( v_typeof == "number" ) 
@@ -79,16 +79,15 @@ dc.schema = function() {
 	
 	if ( currentType != null && thisType != currentType ) {
 	    if ( thisType == "number" && currentType == "integer" ) 
-	        return "number";
+	        thisType = "number";
 	    if ( thisType == "integer" && currentType == "number" ) 
-	        return "number";
+	        thisType = "number";
 	    if ( thisType == "date" && currentType == "string" ) 
-	        return "string";
+	        thisType = "string";
 	    else
-	        return "mixed";
+	        thisType = "mixed";
 	}
-	else
-	    return  { 'type' : thisType, 'coercedValue' : coercedValue, 'wasCoerced' : wasCoerced };
+	return  { 'type' : thisType, 'coercedValue' : coercedValue, 'wasCoerced' : wasCoerced };
     };
 
     var objectSize = function(obj) {

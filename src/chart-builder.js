@@ -62,7 +62,7 @@ dc.chartBuilder = function() {
 	    hier[propname] = crossfilter_obj.info[propname];
 	}
 
-	if ( hier ) {
+	if (  hier_type ) {
 	    var hlist = [];
 	    for ( propname in hier ) {
 		delete crossfilter_obj.info[propname];
