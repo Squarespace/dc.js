@@ -53,6 +53,17 @@ dc.chartBuilder = function() {
 				.style("display", "none").text("reset");
 	};
 
+	function cloneObject(obj) {
+		if (typeof (obj) != "object")
+			return obj;
+		var clone = {};
+		for ( var k in obj) {
+			if (obj.hasOwnProperty(k))
+				clone[k] = cloneObject(obj[k]);
+		}
+		return clone;
+	}
+	
 	chartBuilder.build = function(selection, crossfilter_obj) {
 
 		var charts = {};
@@ -97,7 +108,7 @@ dc.chartBuilder = function() {
 				}
 				crossfilter_obj.dimensions[hier_name] = dims;
 				crossfilter_obj.groups[hier_name] = grps;
-				crossfilter_obj.info[hier_name] = hlist[0];
+				crossfilter_obj.info[hier_name] = cloneObject(hlist[0]);
 				crossfilter_obj.info[hier_name].drilldown = true;
 				crossfilter_obj.info[hier_name].field_name = hier_name;
 			}
