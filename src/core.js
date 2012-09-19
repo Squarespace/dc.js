@@ -11,12 +11,13 @@ dc.hasChart = function(chart) {
     return dc._charts.indexOf(chart) >= 0;
 };
 
-dc._isSelfOrDescendantNode = function(parent, child) {
-     while (child != null) {
-         if (child == parent) {
+dc._isDescendantNode = function(parent, child) {
+    var node = child.parentNode;
+     while (node != null) {
+         if (node == parent) {
              return true;
          }
-         child = child.parentNode;
+         node = node.parentNode;
      }
      return false;
 };
@@ -24,7 +25,7 @@ dc._isSelfOrDescendantNode = function(parent, child) {
 dc.getChartFor = function(element) {
     for ( var i = 0; i < dc._charts.length; i++ ) {
         var ch = dc._charts[i];
-	if ( dc._isSelfOrDescendantNode(ch.root().node(), element) )
+	if ( dc._isDescendantNode(ch.root().node(), element) )
 	    return ch;
     }
     return null;

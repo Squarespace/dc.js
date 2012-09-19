@@ -35,7 +35,7 @@ dc.singleSelectionChart = function(chart, hierarchical) {
 			if (chart.dataAreSet())
 				chart.dimension().filter(_filter);
 
-			if (f) {
+			if (f != null) {
 				chart.turnOnControls();
 			} else {
 				chart.turnOffControls();

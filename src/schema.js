@@ -56,7 +56,10 @@ dc.schema = function() {
 	var v_typeof = typeof(v);
 	var coercedValue = v;
 	var wasCoerced = false;
-        if ( v_typeof == "string" ) {
+	if( Object.prototype.toString.call( v ) === '[object Array]' ) {
+	    thisType = 'array';
+	}
+        else if ( v_typeof == "string" ) {
 	    var pdate = parsePossibleDate(v);
 	    if ( pdate != null ) {
 		thisType = "date";
