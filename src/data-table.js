@@ -62,7 +62,7 @@ dc.dataTable = function(selector) {
         for (var i = 0; i < columns.length; ++i) {
             var f = columns[i];
             rowEnter.append("span")
-                .attr("class", "column " + i)
+                .attr("class", "column column-" + i + (columns.length - i == 1 ? " last-column" : ""))
                 .text(function(d) {
                     return f(d);
                 });
