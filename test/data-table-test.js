@@ -47,14 +47,14 @@ suite.addBatch({
             assert.equal(chart.order(), d3.ascending);
         },
         'should have id column created':function(chart) {
-            assert.equal(chart.selectAll("span.0")[0][0].innerHTML, 8);
-            assert.equal(chart.selectAll("span.0")[0][1].innerHTML, 3);
-            assert.equal(chart.selectAll("span.0")[0][2].innerHTML, 9);
+            assert.equal(chart.selectAll("span.column-0")[0][0].innerHTML, 8);
+            assert.equal(chart.selectAll("span.column-0")[0][1].innerHTML, 3);
+            assert.equal(chart.selectAll("span.column-0")[0][2].innerHTML, 9);
         },
         'should have status column created':function(chart) {
-            assert.equal(chart.selectAll("span.1")[0][0].innerHTML, "F");
-            assert.equal(chart.selectAll("span.1")[0][1].innerHTML, "T");
-            assert.equal(chart.selectAll("span.1")[0][2].innerHTML, "T");
+            assert.equal(chart.selectAll("span.column-1")[0][0].innerHTML, "F");
+            assert.equal(chart.selectAll("span.column-1")[0][1].innerHTML, "T");
+            assert.equal(chart.selectAll("span.column-1")[0][2].innerHTML, "T");
         },
         'teardown': function() {
             resetAllFilters();
@@ -72,11 +72,11 @@ suite.addBatch({
             return chart;
         },
         'should only render filtered data set': function(chart) {
-            assert.equal(chart.selectAll("span.0")[0].length, 2);
+            assert.equal(chart.selectAll("span.column-0")[0].length, 2);
         },
         'should render the correctly filtered records': function(chart) {
-            assert.equal(chart.selectAll("span.0")[0][0].innerHTML, 5);
-            assert.equal(chart.selectAll("span.0")[0][1].innerHTML, 7);
+            assert.equal(chart.selectAll("span.column-0")[0][0].innerHTML, 5);
+            assert.equal(chart.selectAll("span.column-0")[0][1].innerHTML, 7);
         },
         'teardown': function() {
             resetAllFilters();
