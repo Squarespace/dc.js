@@ -11,12 +11,13 @@ dc.hasChart = function(chart) {
     return dc._charts.indexOf(chart) >= 0;
 };
 
-dc._isSelfOrDescendantNode = function(parent, child) {
-     while (child != null) {
-         if (child == parent) {
+dc._isDescendantNode = function(parent, child) {
+    var node = child.parentNode;
+     while (node != null) {
+         if (node == parent) {
              return true;
          }
-         child = child.parentNode;
+         node = node.parentNode;
      }
      return false;
 };
@@ -24,7 +25,7 @@ dc._isSelfOrDescendantNode = function(parent, child) {
 dc.getChartFor = function(element) {
     for ( var i = 0; i < dc._charts.length; i++ ) {
         var ch = dc._charts[i];
-	if ( dc._isSelfOrDescendantNode(ch.root().node(), element) )
+	if ( dc._isDescendantNode(ch.root().node(), element) )
 	    return ch;
     }
     return null;
@@ -174,7 +175,10 @@ dc.schema = function() {
 	var v_typeof = typeof(v);
 	var coercedValue = v;
 	var wasCoerced = false;
-        if ( v_typeof == "string" ) {
+	if( Object.prototype.toString.call( v ) === '[object Array]' ) {
+	    thisType = 'array';
+	}
+        else if ( v_typeof == "string" ) {
 	    var pdate = parsePossibleDate(v);
 	    if ( pdate != null ) {
 		thisType = "date";
@@ -277,391 +281,346 @@ dc.schema = function() {
 }();
 dc.chartStrategy = function() {
 
-	var chartStrategy = {};
+    var chartStrategy = {};
 
-	chartStrategy.PIE_THRESHOLD = 10;
-	chartStrategy.DRILLDOWN_SETS = {
-		'attribution': ['channel', 'subchannel', 'source', 'campaign', 'subcampaign']
-	};
-	chartStrategy.EXCLUDED_PROPERTIES = {
-		'coupon_ids' : true,
-		'website_id' : true
-	};
-	chartStrategy.STRING_CARDINALITY_THRESHOLD = 200;
-	chartStrategy.STRING_CARDINALITY_PCT_THRESHOLD = .4;
+    chartStrategy.PIE_THRESHOLD = 10;
+    chartStrategy.ATTRIBUTION_PROPERTIES = { 'channel': 1, 'subchannel': 2, 'source': 3, 'campaign': 4, 'subcampaign': 5 };
+    chartStrategy.EXCLUDED_PROPERTIES = { 'coupon_ids' : true, 'website_id' : true };
+    chartStrategy.STRING_CARDINALITY_THRESHOLD = 200;
+    chartStrategy.STRING_CARDINALITY_PCT_THRESHOLD = .9;;
 
-	chartStrategy.VALUE_ACCESSORS = {
-		"standard" : function(name) {
-			return function(d) {
-				var v = d[name];
-				return v == null ? "" : v;
-			}
-		},
-		"day" : function(name) {
-			return function(d) {
-				return d3.time.day(d[name]);
-			}
-		},
-		"hour" : function(name) {
-			return function(d) {
-				return d[name] ? d[name].getHours() : null;
-			}
-		},
-		"weekday" : function(name) {
-			var names = [ 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat' ];
-			return function(d) {
-				return d[name] != null ? names[d[name].getDay()] : null;
-			};
-		}
-	};
+    chartStrategy.VALUE_ACCESSORS = {
+        "standard": function(name) { return function(d) { var v = d[name]; return v == null ? "" : v; } },
+        "day": function(name) { return function(d) { 
+		return d3.time.day(d[name]); 
+	    } 
+	},
+        "hour": function(name) { return function(d) { return d[name] ? d[name].getHours() : null; } },
+        "weekday": function(name) { var names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']; return function(d) { return d[name] != null ? names[d[name].getDay()] : null;  };  }
+    };
 
-	var computeDateDomain = function(minDate, maxDate) {
-		var start = new Date(minDate.getTime());
-		start.setHours(0);
-		start.setMinutes(0);
-		start.setSeconds(0);
-		start.setMilliseconds(0);
-		var end = new Date(maxDate.getTime() + 86400 * 1000);
-		end.setHours(0);
-		end.setMinutes(0);
-		end.setSeconds(0);
-		end.setMilliseconds(0);
-		return [ start, end ];
-	};
+    var computeDateDomain = function(minDate, maxDate) {
+	var start = new Date(minDate.getTime());
+	start.setHours(0);
+	start.setMinutes(0);
+	start.setSeconds(0);
+	start.setMilliseconds(0);
+	var end = new Date(maxDate.getTime() + 86400 * 1000);
+	end.setHours(0);     
+	end.setMinutes(0);
+	end.setSeconds(0);
+	end.setMilliseconds(0);
+	return [ start, end ];
+    };
 
-	function cloneObject(obj) {
-		if (typeof (obj) != "object")
-			return obj;
-		var clone = {};
-		for ( var k in obj) {
-			if (obj.hasOwnProperty(k))
-				clone[k] = cloneObject(obj[k]);
-		}
-		return clone;
+    function cloneObject(obj) {
+       if ( typeof(obj) != "object" ) return obj;
+       var clone = {};
+       for ( var k in obj ) {
+          if ( obj.hasOwnProperty(k) ) 
+	      clone[k] = cloneObject(obj[k]);
+       }
+       return clone;
+    }
+
+    var getFieldStrategy = function(data) {
+        return function(propname, fm) {
+	    // exclude under certain conditions
+	    if ( chartStrategy.EXCLUDED_PROPERTIES[propname] ) 
+		return null;
+	    if ( fm.type == "string" && (!chartStrategy.ATTRIBUTION_PROPERTIES[propname]) &&
+		 ( fm.cardinality > chartStrategy.STRING_CARDINALITY_THRESHOLD || 
+		   fm.cardinality / data.length > chartStrategy.STRING_CARDINALITY_PCT_THRESHOLD ) )
+		return null;
+
+	    // chart type
+	    var chart_type;
+	    if ( fm.type == "date" || 
+		 ( fm.type != "string" && fm.type != "array" && 
+		   !(chartStrategy.ATTRIBUTION_PROPERTIES[propname]) && 
+		   fm.cardinality > chartStrategy.PIE_THRESHOLD ) ) 
+		chart_type = "bar";
+	    else 
+		chart_type = "pie";
+
+	    // value accessor and dimension
+	    // domain/scale, etc.
+	    var value_accessor = null;
+	    var domain = null;
+	    var domainUnits = null;
+	    var round = null;
+	    if ( fm.treatment == "hour" && fm.type == "date" ) {
+		value_accessor = chartStrategy.VALUE_ACCESSORS.hour(propname);
+		domain = d3.scale.linear().domain([0,24]);
+		round = dc.round.floor;
+	    }
+	    else if ( fm.treatment == "weekday" && fm.type == "date" ) {
+		value_accessor = chartStrategy.VALUE_ACCESSORS.weekday(propname);
+		chart_type = "pie";
+	    }
+	    else if ( fm.type == "date" ) {
+		value_accessor = chartStrategy.VALUE_ACCESSORS.day(propname);
+		domain = d3.time.scale().domain(computeDateDomain(fm.minimum, fm.maximum));
+		domainUnits = d3.time.days;
+		round = d3.time.day.round;
+	    }
+	    else if ( chart_type == "bar" ) {
+		value_accessor = chartStrategy.VALUE_ACCESSORS.standard(propname);
+		var max_domain = ( fm.type == "integer" || fm.type == "number" ) ?  fm.maximum + 1 : fm.maximum;
+		domain = d3.scale.linear().domain([fm.minimum, max_domain]);
+		round = dc.round.floor;
+	    }
+	    else {
+		value_accessor = chartStrategy.VALUE_ACCESSORS.standard(propname);
+	    } 
+
+	    // TODO group by sum, etc.
+
+	    return {
+		"field_name": propname,
+		"type" : chart_type,
+		"value_accessor" : value_accessor,
+		"domain" : domain,
+		"domainUnits" : domainUnits,
+		"round" : round,
+		"field_metadata": fm
+	    };
+        };
+    };
+
+    chartStrategy.getStrategy = function(data, metadata) {
+        // given the metadata, make dimensions and groups.
+	var charts = {};
+
+	if ( ! data.length || ! metadata )
+	    return charts;
+
+	var gfs = getFieldStrategy(data);
+	for ( var propname in metadata.properties ) {
+	    var fm = metadata.properties[propname];
+	    var chart_def = gfs(propname, fm);
+	    if ( ! chart_def ) continue;
+
+	    charts[propname] = chart_def;
+
+	    // for date fields, push a special _hour dimension. and a _weekday dimension.
+	    if ( fm.type == "date" ) {
+	        var hour_fm = cloneObject(fm);
+		hour_fm.treatment = 'hour';
+		var hour_chart_def = gfs(propname, hour_fm);
+		hour_chart_def.field_name = propname + "_hour";
+		charts[propname + "_hour"] = hour_chart_def;
+	        var wd_fm = cloneObject(fm);
+		wd_fm.treatment = 'weekday';
+		var wd_chart_def = gfs(propname, wd_fm);
+		wd_chart_def.field_name = propname + "_weekday";
+		charts[propname + "_weekday"] = wd_chart_def;
+	    }
 	}
-	
-	var isInDrilldownSet = function(propname) {
-		for ( var setname in chartStrategy.DRILLDOWN_SETS ) {
-			var props = chartStrategy.DRILLDOWN_SETS[setname];
-			for ( var i = 0; i < props.length; i++ ) {
-				if ( props[i] == propname ) {
-					return true;
-				}
-			}
-		}
-		return false;
-	};
+	return charts;
+    };
 
-	var getFieldStrategy = function(data) {
-		return function(propname, fm) {
-			// exclude under certain conditions
-			if (chartStrategy.EXCLUDED_PROPERTIES[propname])
-				return null;
-			var isDrilldownProperty = isInDrilldownSet(propname);
-			if (fm.type == "string"
-					&& (!isDrilldownProperty)
-					&& (fm.cardinality > chartStrategy.STRING_CARDINALITY_THRESHOLD || fm.cardinality
-							/ data.length > chartStrategy.STRING_CARDINALITY_PCT_THRESHOLD))
-				return null;
-
-			// chart type
-			var chart_type;
-			if (fm.type == "date"
-					|| (fm.type != "string"
-							&& (!isDrilldownProperty) && fm.cardinality > chartStrategy.PIE_THRESHOLD))
-				chart_type = "bar";
-			else
-				chart_type = "pie";
-
-			// value accessor and dimension
-			// domain/scale, etc.
-			var value_accessor = null;
-			var domain = null;
-			var domainUnits = null;
-			var round = null;
-			if (fm.treatment == "hour" && fm.type == "date") {
-				value_accessor = chartStrategy.VALUE_ACCESSORS.hour(propname);
-				domain = d3.scale.linear().domain([ 0, 24 ]);
-				round = dc.round.floor;
-			} else if (fm.treatment == "weekday" && fm.type == "date") {
-				value_accessor = chartStrategy.VALUE_ACCESSORS
-						.weekday(propname);
-				chart_type = "pie";
-			} else if (fm.type == "date") {
-				value_accessor = chartStrategy.VALUE_ACCESSORS.day(propname);
-				domain = d3.time.scale().domain(
-						computeDateDomain(fm.minimum, fm.maximum));
-				domainUnits = d3.time.days;
-				round = d3.time.day.round;
-			} else if (chart_type == "bar") {
-				value_accessor = chartStrategy.VALUE_ACCESSORS
-						.standard(propname);
-				var max_domain = (fm.type == "integer" || fm.type == "number") ? fm.maximum + 1
-						: fm.maximum;
-				domain = d3.scale.linear().domain([ fm.minimum, max_domain ]);
-				round = dc.round.floor;
-			} else {
-				value_accessor = chartStrategy.VALUE_ACCESSORS
-						.standard(propname);
-			}
-
-			// TODO group by sum, etc.
-
-			return {
-				"field_name" : propname,
-				"type" : chart_type,
-				"value_accessor" : value_accessor,
-				"domain" : domain,
-				"domainUnits" : domainUnits,
-				"round" : round,
-				"field_metadata" : fm
-			};
-		};
-	};
-
-	chartStrategy.getStrategy = function(data, metadata) {
-		// given the metadata, make dimensions and groups.
-		var charts = {};
-
-		if (!data.length || !metadata)
-			return charts;
-
-		var gfs = getFieldStrategy(data);
-		for ( var propname in metadata.properties) {
-			var fm = metadata.properties[propname];
-			var chart_def = gfs(propname, fm);
-			if (!chart_def)
-				continue;
-
-			charts[propname] = chart_def;
-
-			// for date fields, push a special _hour dimension. and a _weekday
-			// dimension.
-			if (fm.type == "date") {
-				var hour_fm = cloneObject(fm);
-				hour_fm.treatment = 'hour';
-				var hour_chart_def = gfs(propname, hour_fm);
-				hour_chart_def.field_name = propname + "_hour";
-				charts[propname + "_hour"] = hour_chart_def;
-				var wd_fm = cloneObject(fm);
-				wd_fm.treatment = 'weekday';
-				var wd_chart_def = gfs(propname, wd_fm);
-				wd_chart_def.field_name = propname + "_weekday";
-				charts[propname + "_weekday"] = wd_chart_def;
-			}
-		}
-		return charts;
-	};
-
-	return chartStrategy;
+    return chartStrategy;
 }();
+
+
 dc.newCrossfilter = function(data, strategy) {
-	var crfilt = crossfilter(data);
-	var obj = {
-		"crossfilter" : crfilt,
-		"dimensions" : {},
-		"groups" : {},
-		"info" : {}
-	};
+    var crfilt = crossfilter(data);
+    var obj = { 
+        "crossfilter": crfilt,
+        "dimensions": {}, 
+        "groups": {}, 
+        "info": {}
+    };  
 
-	for ( var propname in strategy ) {
-		var info = strategy[propname];
-		var dim = crfilt.dimension(info.value_accessor);
-		var grp = dim.group();
-		obj.dimensions[propname] = dim;
-		obj.groups[propname] = grp;
-		obj.info[propname] = info;
+    function dim_group(dim, info) {
+        if ( info.type === 'array' ) {
+	    return dim.groupAll().reduce(
+		function(p,v) { var val = info.value_accessor(v); for ( var i = 0; i < val.length; i++ ) { p[val[i]] = (p[val[i]] || 0) + 1; } return p; },
+		function(p,v) { var val = info.value_accessor(v); for ( var i = 0; i < val.length; i++ ) { p[val[i]] = (p[val[i]] || 1) - 1; } return p; },
+		function() { return {}; }
+	    );
 	}
+	else {
+	    return dim.group();
+	}
+    }
 
-	return obj;
-};
+    for ( var propname in strategy ) { 
+        var info = strategy[propname];
+        var dim = crfilt.dimension(info.value_accessor);
+        var grp = dim_group(dim, info);
+        obj.dimensions[propname] = dim;
+        obj.groups[propname] = grp;
+        obj.info[propname] = info;
+    }   
+
+    return obj;
+};  
 
 dc.chartBuilder = function() {
 
-	var chartBuilder = {
-		"defaultMargins" : {
-			top : 10,
-			right : 50,
-			bottom : 30,
-			left : 40
-		},
-		"defaultHeight" : 100,
-		"defaultWidth" : 900,
-		"defaultTransition" : 300,
-		"defaultPieSize" : 180,
-		"defaultPieRadius" : 80,
-		"defaultPieInnerRadius" : 20
-	};
+    var chartBuilder = {
+	"defaultMargins" : {top: 10, right: 50, bottom: 30, left: 40},
+	"defaultHeight" : 100,
+	"defaultWidth" : 900,
+	"defaultTransition" : 300,
+	"defaultPieSize" : 180,
+	"defaultPieRadius": 80,
+	"defaultPieInnerRadius": 20
+    };
 
-	chartBuilder.chartDivBuilder = function(div, chart_info) {
-		var title = div.append("div").classed("title", true).text(
-				chart_info.field_name);
-		title.append("span").classed("filter", true).style("display", "none")
-		if (chart_info.drilldown) {
-			title
-					.append("span")
-					.classed("filter-pop", true)
-					.attr("onclick",
-							"dc.getChartFor(this).popFilter();dc.redrawAll();return true;")
-					.style("display", "none").text("back");
-		}
-		title.append("span").classed("reset", true).attr("onclick",
-				"dc.getChartFor(this).filterAll();dc.redrawAll();return true;")
-				.style("display", "none").text("reset");
-	};
-
-	function cloneObject(obj) {
-		if (typeof (obj) != "object")
-			return obj;
-		var clone = {};
-		for ( var k in obj) {
-			if (obj.hasOwnProperty(k))
-				clone[k] = cloneObject(obj[k]);
-		}
-		return clone;
+    chartBuilder.chartDivBuilder = function(div, chart_info) {
+        var title = div.append("div").classed("title", true).text(chart_info.field_name);
+	title.append("span").classed("filter", true).style("display", "none")
+	if ( chart_info.hierarchical ) {
+	    title.append("span").classed("filter-pop", true)
+	        .attr("onclick", "dc.getChartFor(this).popFilter();dc.redrawAll();return true;")
+		.style("display", "none").text("back");
 	}
-	
-	chartBuilder.build = function(selection, crossfilter_obj) {
+	title.append("span").classed("reset", true)
+	    .attr("onclick", "dc.getChartFor(this).filterAll();dc.redrawAll();return true;")
+	    .style("display", "none").text("reset");
+    };
 
-		var charts = {};
+    chartBuilder.build = function(selection, crossfilter_obj) {
 
-		// collapse drilldowns into composite charts.
-		// only case handled so far is channel + et al.
-		var props_to_remove = {};
-		for ( var hier_name in dc.chartStrategy.DRILLDOWN_SETS) {
-			var hier_props = dc.chartStrategy.DRILLDOWN_SETS[hier_name];
-			var hier = {};
-			var hier_prop_sort_order = {};
-			var hier_prop_sort_order_idx = 0;
-			var hier_type = null;
-			for ( var i = 0; i < hier_props.length; i++ ) {
-				var propname = hier_props[i];
-				if (hier_type
-						&& crossfilter_obj.info[propname].type != hier_type)
-					continue;
-				hier_type = crossfilter_obj.info[propname].type;
-				hier[propname] = crossfilter_obj.info[propname];
-				hier_prop_sort_order[propname] = hier_prop_sort_order_idx++;
-			}
+	var charts = {};
 
-			if (hier_type) {
-				var hlist = [];
-				for (var propname in hier) {
-					props_to_remove[propname] = true;
-					hlist.push(hier[propname]);
-				}
-				hlist
-						.sort(function(a, b) {
-							var pa = hier_prop_sort_order[a.field_name], pb = hier_prop_sort_order[b.field_name];
-							return pa < pb ? -1 : (pa > pb ? 1 : 0);
-						});
-				crossfilter_obj.info[hier_name] = hlist;
-				var dims = [];
-				var grps = [];
-				for ( var i = 0; i < hlist.length; i++) {
-					var info = hlist[i];
-					dims.push(crossfilter_obj.dimensions[info.field_name]);
-					grps.push(crossfilter_obj.groups[info.field_name]);
-				}
-				crossfilter_obj.dimensions[hier_name] = dims;
-				crossfilter_obj.groups[hier_name] = grps;
-				crossfilter_obj.info[hier_name] = cloneObject(hlist[0]);
-				crossfilter_obj.info[hier_name].drilldown = true;
-				crossfilter_obj.info[hier_name].field_name = hier_name;
-			}
+	// collapse hierarchies into one composite.
+	// only case handled so far is channel + et al.
+	var hier = {};
+	var hier_type = null;
+	var hier_name = 'attribution';
+	for ( var propname in crossfilter_obj.info ) {
+	    if ( ! (propname in dc.chartStrategy.ATTRIBUTION_PROPERTIES) ) 
+		continue;
+	    if ( hier_type && crossfilter_obj.info[propname].type != hier_type )
+		continue;
+	    hier_type = crossfilter_obj.info[propname].type;
+	    hier[propname] = crossfilter_obj.info[propname];
+	}
+
+	if (  hier_type ) {
+	    var hlist = [];
+	    for ( propname in hier ) {
+		delete crossfilter_obj.info[propname];
+		hlist.push(hier[propname]);
+	    }
+	    hlist.sort(
+		function(a,b) { 
+		    var pa = dc.chartStrategy.ATTRIBUTION_PROPERTIES[a.field_name], pb = dc.chartStrategy.ATTRIBUTION_PROPERTIES[b.field_name]; 
+		    return pa < pb ? -1 : ( pa > pb ? 1 : 0 ); 
+		} 
+	    );
+	    crossfilter_obj.info[hier_name] = hlist;
+	    var dims = [];
+	    var grps = [];
+	    for ( var i = 0; i < hlist.length; i++ ) {
+		var info = hlist[i];
+		dims.push(crossfilter_obj.dimensions[info.field_name]);
+		grps.push(crossfilter_obj.groups[info.field_name]);
+		delete crossfilter_obj.dimensions[info.field_name];
+		delete crossfilter_obj.groups[info.field_name];
+	    }
+	    crossfilter_obj.dimensions[hier_name] = dims;
+	    crossfilter_obj.groups[hier_name] = grps;
+	    crossfilter_obj.info[hier_name] = hlist[0];
+	    crossfilter_obj.info[hier_name].hierarchical = true;
+	}
+
+	var propnames = [];
+	for ( var propname in crossfilter_obj.info ) {
+	    propnames.push(propname);
+	}
+	propnames.sort(
+	    function(a,b) { 
+		var pa = crossfilter_obj.info[a].type; 
+		var pb = crossfilter_obj.info[b].type; 
+		return (pa < pb) ? -1 : ( pa > pb ? 1 : 0 ); 
+	    }
+	);
+
+	// the base charts div.
+	var charts_div = selection.select("#charts");
+	if ( charts_div.empty() )
+	    charts_div = selection.append("div").attr("id", "charts").classed("charts", true);
+
+	// put the charts in child divs.
+	for ( var i = 0; i < propnames.length; i++ ) {
+	    var propname = propnames[i];
+	    var info = crossfilter_obj.info[propname];
+	    var selector = propname + "-chart";
+	    if ( selection.select("#" + selector).empty() ) {
+		var chart_div = charts_div.append("div").attr("id", selector)
+		    .classed("chart", true).classed(info.type + "-chart", true);
+		chartBuilder.chartDivBuilder(chart_div, info);
+	    }
+	    var chart = null;
+	    if ( info.type == "bar" ) {
+		chart = dc.barChart("#" + selector)
+		.width(chartBuilder.defaultWidth)
+		.height(chartBuilder.defaultHeight)
+		.transitionDuration(chartBuilder.defaultTransition)
+		.margins(chartBuilder.defaultMargins)
+		.dimension(crossfilter_obj.dimensions[propname])
+		.group(crossfilter_obj.groups[propname])
+		.elasticY(true)
+		.x(info.domain)
+		.round(info.round);
+		if ( info.domainUnits ) { chart.xUnits(info.domainUnits); }
+	    }
+	    else if ( info.type == "pie" ) {
+		var dim = crossfilter_obj.dimensions[propname];
+		var grp = crossfilter_obj.groups[propname];
+		chart = dc.pieChart("#" + selector, Array.isArray(dim))
+		.width(chartBuilder.defaultPieSize)
+		.height(chartBuilder.defaultPieSize)
+		.radius(chartBuilder.defaultPieRadius)
+		.innerRadius(chartBuilder.defaultPieInnerRadius)
+		.transitionDuration(chartBuilder.defaultTransition)
+		.renderTitle(true);
+
+		if ( Array.isArray(dim) ) {
+		    for ( var j = 0; j < dim.length; j++ ) {
+			chart.addDimensionAndGroup(dim[j], grp[j]);
+		    }
 		}
-		for ( var ptr in props_to_remove ) {
-			delete crossfilter_obj.dimensions[ptr];
-			delete crossfilter_obj.groups[ptr];
-			delete crossfilter_obj.info[ptr];
+		else {
+		    chart.dimension(dim).group(grp);
 		}
+	    }
+	    charts[selector] = chart;
+	}
 
-		var propnames = [];
-		for ( var propname in crossfilter_obj.info ) {
-			propnames.push(propname);
-		}
-		propnames.sort(function(a, b) {
-			var pa = crossfilter_obj.info[a].type;
-			var pb = crossfilter_obj.info[b].type;
-			return (pa < pb) ? -1 : (pa > pb ? 1 : 0);
-		});
+	// a reset-all link
+	selection.append("div")
+	    .attr("id", "#reset-all").classed("reset", true)
+	    .attr("onclick", "dc.filterAll();dc.redrawAll();return true")
+	    .text("Reset all");
 
-		// the base charts div.
-		var charts_div = selection.select("#charts");
-		if (charts_div.empty())
-			charts_div = selection.append("div").attr("id", "charts").classed(
-					"charts", true);
+	// a data-count
+	var dc_div = selection.append("div").attr("id", "data-count");
+	dc_div.append("span").classed("filter-count", true).text("-");
+	dc_div.append("span").text(" (");
+	dc_div.append("span").classed("filter-pct", true).text("-");
+	dc_div.append("span").text(") of ");
+	dc_div.append("span").classed("total-count", true).text("-");
+	dc_div.append("span").text(" items selected.");
 
-		// put the charts in child divs.
-		for ( var i = 0; i < propnames.length; i++) {
-			var propname = propnames[i];
-			var info = crossfilter_obj.info[propname];
-			var selector = propname + "-chart";
-			if (selection.select("#" + selector).empty()) {
-				var chart_div = charts_div.append("div").attr("id", selector)
-						.classed("chart", true).classed(info.type + "-chart",
-								true);
-				chartBuilder.chartDivBuilder(chart_div, info);
-			}
-			var chart = null;
-			if (info.type == "bar") {
-				chart = dc.barChart("#" + selector).width(
-						chartBuilder.defaultWidth).height(
-						chartBuilder.defaultHeight).transitionDuration(
-						chartBuilder.defaultTransition).margins(
-						chartBuilder.defaultMargins).dimension(
-						crossfilter_obj.dimensions[propname]).group(
-						crossfilter_obj.groups[propname]).elasticY(true).x(
-						info.domain).round(info.round);
-				if (info.domainUnits) {
-					chart.xUnits(info.domainUnits);
-				}
-			} else if (info.type == "pie") {
-				var dim = crossfilter_obj.dimensions[propname];
-				var grp = crossfilter_obj.groups[propname];
-				chart = dc.pieChart("#" + selector, Array.isArray(dim)).width(
-						chartBuilder.defaultPieSize).height(
-						chartBuilder.defaultPieSize).radius(
-						chartBuilder.defaultPieRadius).innerRadius(
-						chartBuilder.defaultPieInnerRadius).transitionDuration(
-						chartBuilder.defaultTransition).renderTitle(true);
+	charts['data-count'] = dc.dataCount("#data-count")
+	                         .dimension(crossfilter_obj.crossfilter)
+				 .group(crossfilter_obj.crossfilter.groupAll());
 
-				if (Array.isArray(dim)) {
-					for ( var j = 0; j < dim.length; j++) {
-						chart.addDimensionAndGroup(dim[j], grp[j]);
-					}
-				} else {
-					chart.dimension(dim).group(grp);
-				}
-			}
-			charts[selector] = chart;
-		}
+	// TODO a data-table
 
-		// a reset-all link
-		selection.append("div").attr("id", "#reset-all").classed("reset", true)
-				.attr("onclick", "dc.filterAll();dc.redrawAll();return true")
-				.text("Reset all");
+	return charts;
+    };
 
-		// a data-count
-		var dc_div = selection.append("div").attr("id", "data-count");
-		dc_div.append("span").classed("filter-count", true).text("-");
-		dc_div.append("span").text(" (");
-		dc_div.append("span").classed("filter-pct", true).text("-");
-		dc_div.append("span").text(") of ");
-		dc_div.append("span").classed("total-count", true).text("-");
-		dc_div.append("span").text(" items selected.");
-
-		charts['data-count'] = dc.dataCount("#data-count").dimension(
-				crossfilter_obj.crossfilter).group(
-				crossfilter_obj.crossfilter.groupAll());
-
-		// TODO a data-table
-
-		return charts;
-	};
-
-	return chartBuilder;
+    return chartBuilder;
 }();
+
+
 dc.baseChart = function(chart) {
     var _dimension;
     var _group;
@@ -1187,7 +1146,7 @@ dc.singleSelectionChart = function(chart, hierarchical) {
 			if (chart.dataAreSet())
 				chart.dimension().filter(_filter);
 
-			if (f) {
+			if (f != null) {
 				chart.turnOnControls();
 			} else {
 				chart.turnOffControls();
@@ -1774,7 +1733,7 @@ dc.dataTable = function(selector) {
         for (var i = 0; i < columns.length; ++i) {
             var f = columns[i];
             rowEnter.append("span")
-                .attr("class", "column " + i)
+                .attr("class", "column column-" + i + (columns.length - i == 1 ? " last-column" : ""))
                 .text(function(d) {
                     return f(d);
                 });
