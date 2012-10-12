@@ -52,26 +52,8 @@ dc.tableChart = function(selector, hierarchical) {
       return chart;
     };
 
-    chart.isSelectedSlice = function(d) {
-        return chart.filter() == chart.keyRetriever()(d.data);
-    };
-
     chart.redraw = function() {
       chart.render();
-
-      if (chart.hasFilter()) {
-          chart.selectAll("div.row").each(function(d) {
-              if (chart.isSelectedSlice(d)) {
-                  chart.highlightSelected(this);
-              } else {
-                  chart.fadeDeselected(this);
-              }
-          });
-      } else {
-          chart.selectAll("div.row").each(function(d) {
-              chart.resetHighlight(this);
-          });
-      }
     };
 
     function calculateDataPie() {
