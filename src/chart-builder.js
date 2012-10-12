@@ -41,7 +41,9 @@ dc.chartBuilder = function() {
 	"defaultTransition" : 300,
 	"defaultPieSize" : 180,
 	"defaultPieRadius": 80,
-	"defaultPieInnerRadius": 20
+	"defaultPieInnerRadius": 20,
+	"defaultTableWidth": 200,
+	"defaultTableHeight": 300
     };
 
     chartBuilder.chartDivBuilder = function(div, chart_info) {
@@ -152,6 +154,24 @@ dc.chartBuilder = function() {
 		.height(chartBuilder.defaultPieSize)
 		.radius(chartBuilder.defaultPieRadius)
 		.innerRadius(chartBuilder.defaultPieInnerRadius)
+		.transitionDuration(chartBuilder.defaultTransition)
+		.renderTitle(true);
+
+		if ( Array.isArray(dim) ) {
+		    for ( var j = 0; j < dim.length; j++ ) {
+			chart.addDimensionAndGroup(dim[j], grp[j]);
+		    }
+		}
+		else {
+		    chart.dimension(dim).group(grp);
+		}
+	    }}
+	    else if ( info.type == "table" ) {
+		var dim = crossfilter_obj.dimensions[propname];
+		var grp = crossfilter_obj.groups[propname];
+		chart = dc.tableChart("#" + selector, Array.isArray(dim))
+		.width(chartBuilder.defaultTableWidth)
+		.height(chartBuilder.defaultTableHeight)
 		.transitionDuration(chartBuilder.defaultTransition)
 		.renderTitle(true);
 

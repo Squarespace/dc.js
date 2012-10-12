@@ -2,11 +2,11 @@ dc.chartStrategy = function() {
 
     var chartStrategy = {};
 
-    chartStrategy.PIE_THRESHOLD = 10;
+    chartStrategy.PIE_THRESHOLD = 5;
     chartStrategy.ATTRIBUTION_PROPERTIES = { 'channel': 1, 'subchannel': 2, 'source': 3, 'campaign': 4, 'subcampaign': 5 };
     chartStrategy.EXCLUDED_PROPERTIES = { 'coupon_ids' : true, 'website_id' : true };
     chartStrategy.STRING_CARDINALITY_THRESHOLD = 200;
-    chartStrategy.STRING_CARDINALITY_PCT_THRESHOLD = .9;;
+    chartStrategy.STRING_CARDINALITY_PCT_THRESHOLD = .9;
 
     chartStrategy.VALUE_ACCESSORS = {
         "standard": function(name) { return function(d) { var v = d[name]; return v == null ? "" : v; } },
@@ -54,11 +54,13 @@ dc.chartStrategy = function() {
 
 	    // chart type
 	    var chart_type;
-	    if ( fm.type == "date" || 
+	    if ( fm.type == "date" ||
 		 ( fm.type != "string" && fm.type != "array" && 
 		   !(chartStrategy.ATTRIBUTION_PROPERTIES[propname]) && 
 		   fm.cardinality > chartStrategy.PIE_THRESHOLD ) ) 
 		chart_type = "bar";
+	    else if ( fm.cardinality > chartStrategy.PIE_THRESHOLD ) 
+		chart_type = "table";
 	    else 
 		chart_type = "pie";
 
