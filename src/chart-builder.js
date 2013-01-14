@@ -165,7 +165,7 @@ dc.chartBuilder = function() {
 		else {
 		    chart.dimension(dim).group(grp);
 		}
-	    }}
+	    }
 	    else if ( info.type == "table" ) {
 		var dim = crossfilter_obj.dimensions[propname];
 		var grp = crossfilter_obj.groups[propname];

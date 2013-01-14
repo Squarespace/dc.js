@@ -283,11 +283,11 @@ dc.chartStrategy = function() {
 
     var chartStrategy = {};
 
-    chartStrategy.PIE_THRESHOLD = 10;
+    chartStrategy.PIE_THRESHOLD = 5;
     chartStrategy.ATTRIBUTION_PROPERTIES = { 'channel': 1, 'subchannel': 2, 'source': 3, 'campaign': 4, 'subcampaign': 5 };
     chartStrategy.EXCLUDED_PROPERTIES = { 'coupon_ids' : true, 'website_id' : true };
     chartStrategy.STRING_CARDINALITY_THRESHOLD = 200;
-    chartStrategy.STRING_CARDINALITY_PCT_THRESHOLD = .9;;
+    chartStrategy.STRING_CARDINALITY_PCT_THRESHOLD = .9;
 
     chartStrategy.VALUE_ACCESSORS = {
         "standard": function(name) { return function(d) { var v = d[name]; return v == null ? "" : v; } },
@@ -335,11 +335,13 @@ dc.chartStrategy = function() {
 
 	    // chart type
 	    var chart_type;
-	    if ( fm.type == "date" || 
+	    if ( fm.type == "date" ||
 		 ( fm.type != "string" && fm.type != "array" && 
 		   !(chartStrategy.ATTRIBUTION_PROPERTIES[propname]) && 
 		   fm.cardinality > chartStrategy.PIE_THRESHOLD ) ) 
 		chart_type = "bar";
+	    else if ( fm.cardinality > chartStrategy.PIE_THRESHOLD ) 
+		chart_type = "table";
 	    else 
 		chart_type = "pie";
 
@@ -467,7 +469,9 @@ dc.chartBuilder = function() {
 	"defaultTransition" : 300,
 	"defaultPieSize" : 180,
 	"defaultPieRadius": 80,
-	"defaultPieInnerRadius": 20
+	"defaultPieInnerRadius": 20,
+	"defaultTableWidth": 200,
+	"defaultTableHeight": 300
     };
 
     chartBuilder.chartDivBuilder = function(div, chart_info) {
@@ -578,6 +582,24 @@ dc.chartBuilder = function() {
 		.height(chartBuilder.defaultPieSize)
 		.radius(chartBuilder.defaultPieRadius)
 		.innerRadius(chartBuilder.defaultPieInnerRadius)
+		.transitionDuration(chartBuilder.defaultTransition)
+		.renderTitle(true);
+
+		if ( Array.isArray(dim) ) {
+		    for ( var j = 0; j < dim.length; j++ ) {
+			chart.addDimensionAndGroup(dim[j], grp[j]);
+		    }
+		}
+		else {
+		    chart.dimension(dim).group(grp);
+		}
+	    }
+	    else if ( info.type == "table" ) {
+		var dim = crossfilter_obj.dimensions[propname];
+		var grp = crossfilter_obj.groups[propname];
+		chart = dc.tableChart("#" + selector, Array.isArray(dim))
+		.width(chartBuilder.defaultTableWidth)
+		.height(chartBuilder.defaultTableHeight)
 		.transitionDuration(chartBuilder.defaultTransition)
 		.renderTitle(true);
 
@@ -1648,7 +1670,77 @@ dc.lineChart = function(parent) {
 
     return chart.anchor(parent);
 };
-dc.dataCount = function(selector) {
+
+dc.tableChart = function(selector, hierarchical) {
+
+    var chart = dc.singleSelectionChart(dc.colorChart(dc.baseChart({})), hierarchical);
+
+    chart.label(function(d) {
+        return chart.valuePrinter()(chart.keyRetriever()(d.data));
+    });
+    chart.renderLabel(true);
+
+    chart.title(function(d) {
+        return chart.valuePrinter()(d.data.key) + ": " + chart.valuePrinter()(d.data.value);
+    });
+
+    chart.transitionDuration(350);
+
+    chart.render = function() {
+      chart.selectAll("div.row").remove();
+
+      if (chart.dataAreSet()) {
+
+        dataPie = calculateDataPie();
+        
+        var rowEnter = chart.root()
+          .selectAll("div.row")
+          .data(dataPie(chart.group().top(Infinity)))
+          .enter()
+          .append("div")
+          .attr("class", "row");
+
+
+        var columns = [
+            function(d) {
+              return d.data.key;
+            },
+            function(d) {
+              return d.data.value;
+            }
+          ];
+        
+        for (var i = 0; i < columns.length; ++i) {
+              var f = columns[i];
+              rowEnter.append("span")
+                  .attr("class", "column column-" + i + (columns.length - i == 1 ? " last-column" : ""))
+                  .text(function(d) {
+                      return f(d);
+                  })
+                  .on('click', onClick);
+        }
+      }
+
+      return chart;
+    };
+
+    chart.redraw = function() {
+      chart.render();
+    };
+
+    function calculateDataPie() {
+        return d3.layout.pie().value(function(d) {
+            return chart.valueRetriever()(d);
+        });
+    }
+
+    function onClick(d) {
+        chart.filter(chart.keyRetriever()(d.data));
+        dc.redrawAll();
+    }
+
+    return chart.anchor(selector);
+};dc.dataCount = function(selector) {
     var formatNumber = d3.format(",d");
     var formatPct = d3.format("2.1f");
     var chart = dc.baseChart({});
