@@ -597,7 +597,7 @@ dc.chartBuilder = function() {
 	    else if ( info.type == "table" ) {
 		var dim = crossfilter_obj.dimensions[propname];
 		var grp = crossfilter_obj.groups[propname];
-		chart = dc.tableChart("#" + selector, Array.isArray(dim))
+		chart = dc.leaderboardChart("#" + selector, Array.isArray(dim))
 		.width(chartBuilder.defaultTableWidth)
 		.height(chartBuilder.defaultTableHeight)
 		.transitionDuration(chartBuilder.defaultTransition)
@@ -1671,7 +1671,7 @@ dc.lineChart = function(parent) {
     return chart.anchor(parent);
 };
 
-dc.tableChart = function(selector, hierarchical) {
+dc.leaderboardChart = function(selector, hierarchical) {
 
     var chart = dc.singleSelectionChart(dc.colorChart(dc.baseChart({})), hierarchical);
 
@@ -1695,7 +1695,7 @@ dc.tableChart = function(selector, hierarchical) {
         
         var rowEnter = chart.root()
           .selectAll("div.row")
-          .data(dataPie(chart.group().top(Infinity)))
+          .data(dataPie(filteredData(chart.group().top(Infinity))))
           .enter()
           .append("div")
           .attr("class", "row");
@@ -1734,13 +1734,22 @@ dc.tableChart = function(selector, hierarchical) {
         });
     }
 
+    function filteredData(data) {
+      var newdata = [];
+      for ( var i = 0; i < data.length; i++ ) {
+        if ( chart.valueRetriever()(data[i]) > 0 ) newdata.push(data[i]);
+      }
+      return newdata;
+    }
+
     function onClick(d) {
         chart.filter(chart.keyRetriever()(d.data));
         dc.redrawAll();
     }
 
     return chart.anchor(selector);
-};dc.dataCount = function(selector) {
+};
+dc.dataCount = function(selector) {
     var formatNumber = d3.format(",d");
     var formatPct = d3.format("2.1f");
     var chart = dc.baseChart({});

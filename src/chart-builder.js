@@ -169,7 +169,7 @@ dc.chartBuilder = function() {
 	    else if ( info.type == "table" ) {
 		var dim = crossfilter_obj.dimensions[propname];
 		var grp = crossfilter_obj.groups[propname];
-		chart = dc.tableChart("#" + selector, Array.isArray(dim))
+		chart = dc.leaderboardChart("#" + selector, Array.isArray(dim))
 		.width(chartBuilder.defaultTableWidth)
 		.height(chartBuilder.defaultTableHeight)
 		.transitionDuration(chartBuilder.defaultTransition)
