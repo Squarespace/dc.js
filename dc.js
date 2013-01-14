@@ -341,7 +341,7 @@ dc.chartStrategy = function() {
 		   fm.cardinality > chartStrategy.PIE_THRESHOLD ) ) 
 		chart_type = "bar";
 	    else if ( fm.cardinality > chartStrategy.PIE_THRESHOLD ) 
-		chart_type = "table";
+		chart_type = "leaderboard";
 	    else 
 		chart_type = "pie";
 
@@ -594,7 +594,7 @@ dc.chartBuilder = function() {
 		    chart.dimension(dim).group(grp);
 		}
 	    }
-	    else if ( info.type == "table" ) {
+	    else if ( info.type == "leaderboard" ) {
 		var dim = crossfilter_obj.dimensions[propname];
 		var grp = crossfilter_obj.groups[propname];
 		chart = dc.leaderboardChart("#" + selector, Array.isArray(dim))
@@ -1687,13 +1687,15 @@ dc.leaderboardChart = function(selector, hierarchical) {
     chart.transitionDuration(350);
 
     chart.render = function() {
-      chart.selectAll("div.row").remove();
+      chart.selectAll("div.row-container").remove();
 
       if (chart.dataAreSet()) {
 
         dataPie = calculateDataPie();
         
-        var rowEnter = chart.root()
+        var rowContainer = chart.root().append("div").attr("class", "row-container");
+
+        var rowEnter = rowContainer
           .selectAll("div.row")
           .data(dataPie(filteredData(chart.group().top(Infinity))))
           .enter()

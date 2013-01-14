@@ -60,7 +60,7 @@ dc.chartStrategy = function() {
 		   fm.cardinality > chartStrategy.PIE_THRESHOLD ) ) 
 		chart_type = "bar";
 	    else if ( fm.cardinality > chartStrategy.PIE_THRESHOLD ) 
-		chart_type = "table";
+		chart_type = "leaderboard";
 	    else 
 		chart_type = "pie";
 
