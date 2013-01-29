@@ -256,9 +256,12 @@ dc.schema = function() {
 		    fmd.values = uniqs;
 		}
 		// val coerced to string for key, but kept intact for value.
-		if ( uniqs[val] === undefined ) 
+		if ( uniqs[val] === undefined )  {
 		    fmd.cardinality++;
-		    uniqs[ val ] = val;
+		    uniqs[ val ] = { value: val, count: 0 };
+    }
+    uniqs[val].count++;
+
 		// max and min.
 		if ( fmd.minimum === undefined || val < fmd.minimum ) 
 		    fmd.minimum = val;
@@ -272,6 +275,17 @@ dc.schema = function() {
 	    if ( fmd.cardinality >  CARDINALITY_THRESHOLD_TO_PRESERVE_VALUES ) {
 		    delete fmd.values;
 	    }
+      else {
+        var lfv, mfv;
+        for ( var k in fmd.values ) {
+          if ( lfv == undefined || fmd.values[k].count < lfv ) 
+            lfv = fmd.values[k].count;
+          if ( mfv == undefined || fmd.values[k].count > mfv ) 
+            mfv = fmd.values[k].count;
+        }
+        fmd.least_value_frequency = lfv;
+        fmd.greatest_value_frequency = mfv;
+      }
 	}
 
 	return metadata;
@@ -284,6 +298,7 @@ dc.chartStrategy = function() {
     var chartStrategy = {};
 
     chartStrategy.PIE_THRESHOLD = 5;
+    chartStrategy.PIE_LEAST_VALUE_FREQUENCY_MINIMUM = 0.05;
     chartStrategy.ATTRIBUTION_PROPERTIES = { 'channel': 1, 'subchannel': 2, 'source': 3, 'campaign': 4, 'subcampaign': 5 };
     chartStrategy.EXCLUDED_PROPERTIES = { 'coupon_ids' : true, 'website_id' : true };
     chartStrategy.STRING_CARDINALITY_THRESHOLD = 200;
@@ -340,7 +355,7 @@ dc.chartStrategy = function() {
 		   !(chartStrategy.ATTRIBUTION_PROPERTIES[propname]) && 
 		   fm.cardinality > chartStrategy.PIE_THRESHOLD ) ) 
 		chart_type = "bar";
-	    else if ( fm.cardinality > chartStrategy.PIE_THRESHOLD ) 
+	    else if ( fm.cardinality > chartStrategy.PIE_THRESHOLD || (fm.least_value_frequency / data.length < chartStrategy.PIE_LEAST_VALUE_FREQUENCY_MINIMUM )  )
 		chart_type = "leaderboard";
 	    else 
 		chart_type = "pie";

@@ -137,9 +137,12 @@ dc.schema = function() {
 		    fmd.values = uniqs;
 		}
 		// val coerced to string for key, but kept intact for value.
-		if ( uniqs[val] === undefined ) 
+		if ( uniqs[val] === undefined )  {
 		    fmd.cardinality++;
-		    uniqs[ val ] = val;
+		    uniqs[ val ] = { value: val, count: 0 };
+    }
+    uniqs[val].count++;
+
 		// max and min.
 		if ( fmd.minimum === undefined || val < fmd.minimum ) 
 		    fmd.minimum = val;
@@ -153,6 +156,17 @@ dc.schema = function() {
 	    if ( fmd.cardinality >  CARDINALITY_THRESHOLD_TO_PRESERVE_VALUES ) {
 		    delete fmd.values;
 	    }
+      else {
+        var lfv, mfv;
+        for ( var k in fmd.values ) {
+          if ( lfv == undefined || fmd.values[k].count < lfv ) 
+            lfv = fmd.values[k].count;
+          if ( mfv == undefined || fmd.values[k].count > mfv ) 
+            mfv = fmd.values[k].count;
+        }
+        fmd.least_value_frequency = lfv;
+        fmd.greatest_value_frequency = mfv;
+      }
 	}
 
 	return metadata;
