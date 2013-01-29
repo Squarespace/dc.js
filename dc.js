@@ -278,10 +278,12 @@ dc.schema = function() {
       else {
         var lfv, mfv;
         for ( var k in fmd.values ) {
-          if ( lfv == undefined || fmd.values[k].count < lfv ) 
-            lfv = fmd.values[k].count;
-          if ( mfv == undefined || fmd.values[k].count > mfv ) 
-            mfv = fmd.values[k].count;
+          var val = fmd.values[k].count;
+          if ( val == null ) continue;
+          if ( lfv == undefined || val < lfv ) 
+            lfv = val;
+          if ( mfv == undefined || val > mfv ) 
+            mfv = val;
         }
         fmd.least_value_frequency = lfv;
         fmd.greatest_value_frequency = mfv;
