@@ -88,8 +88,9 @@ dc.chartStrategy = function() {
 	    }
 	    else if ( chart_type == "bar" ) {
 		value_accessor = chartStrategy.VALUE_ACCESSORS.standard(propname);
-		var max_domain = ( fm.type == "integer" || fm.type == "number" ) ?  fm.maximum + 1 : fm.maximum;
-		domain = d3.scale.linear().domain([fm.minimum, max_domain]);
+		var max_domain = ( fm.type == "integer" || fm.type == "number" ) ?  (+fm.maximum) + 1 : (+fm.maximum);
+		var min_domain = ( fm.type == "integer" || fm.type == "number" ) ?  (+fm.minimum) : fm.minimum;
+		domain = d3.scale.linear().domain([min_domain, max_domain]);
 		round = dc.round.floor;
 	    }
 	    else {
