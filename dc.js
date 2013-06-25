@@ -146,37 +146,6 @@ dc.schema = function() {
     };
 
 
-    var schema = {};
-
-    schema.coerceData = function(data, metadata) {
-        // find all properies whose type is 'date'.
-	var dateprops = {};
-	for ( var name in metadata.properties ) {
-	    if ( metadata.properties[name].type == "date" ) {
-	        dateprops[name] = true;
-		var md = metadata.properties[name]; 
-		if ( md.minimum != null ) { 
-		    md.minimum = parsePossibleDate(md.minimum);
-		}
-		if ( md.maximum != null ) {
-		    md.maximum = parsePossibleDate(md.maximum);
-		}
-		
-	    }
-	}
-	if ( ! dateprops ) { return; }
-	for ( var i=0; i < data.length; i++ ) {
-	    var d = data[i];
-	    for ( var k in d ) {
-	        if (  dateprops[k] ) {
-		    d[k] = parsePossibleDate(d[k]);
-		}
-	    }
-	}
-    };
-
-    var newFieldMetadata = function() { return { "required": true, "cardinality": 0 }; };
-
     var _date_granularities = {
       'day': 1,
       'hour': 2,
@@ -186,7 +155,7 @@ dc.schema = function() {
 
     var setDateGranularity = function(fmd, d) {
       if ( ! fmd.date_granularity ) {
-        fmd.date_granularity = 'month';
+        fmd.date_granularity = 'day';
       }
       if ( d == null ) {
         return;
@@ -201,6 +170,37 @@ dc.schema = function() {
         fmd.date_granularity = 'hour';
       }
     };
+
+    var schema = {};
+
+    schema.coerceData = function(data, metadata) {
+        // find all properies whose type is 'date'.
+      var dateprops = {};
+      for ( var name in metadata.properties ) {
+        if ( metadata.properties[name].type == "date" ) {
+	        dateprops[name] = metadata.properties[name];
+          var md = metadata.properties[name]; 
+          if ( md.minimum != null ) { 
+            md.minimum = parsePossibleDate(md.minimum);
+          }
+          if ( md.maximum != null ) {
+            md.maximum = parsePossibleDate(md.maximum);
+          }
+        }
+      }
+    if ( ! dateprops ) { return; }
+    for ( var i=0; i < data.length; i++ ) {
+	    var d = data[i];
+	    for ( var k in d ) {
+	      if (  dateprops[k] ) {
+          d[k] = parsePossibleDate(d[k]);
+          setDateGranularity(dateprops[k], d[k]);
+        }
+	    }
+      }
+    };
+
+    var newFieldMetadata = function() { return { "required": true, "cardinality": 0 }; };
 
     var determineDataType = function(v, currentType, coerce) {
 	var thisType = "unknown";
