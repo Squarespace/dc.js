@@ -1,4 +1,4 @@
-dc.newCrossfilter = function(data, strategy) {
+dc.newCrossfilter = function(data, strategy, options) {
     var crfilt = crossfilter(data);
     var obj = { 
         "crossfilter": crfilt,
@@ -9,15 +9,15 @@ dc.newCrossfilter = function(data, strategy) {
 
     function dim_group(dim, info) {
         if ( info.type === 'array' ) {
-	    return dim.groupAll().reduce(
-		function(p,v) { var val = info.value_accessor(v); for ( var i = 0; i < val.length; i++ ) { p[val[i]] = (p[val[i]] || 0) + 1; } return p; },
-		function(p,v) { var val = info.value_accessor(v); for ( var i = 0; i < val.length; i++ ) { p[val[i]] = (p[val[i]] || 1) - 1; } return p; },
-		function() { return {}; }
-	    );
-	}
-	else {
-	    return dim.group();
-	}
+            return dim.groupAll().reduce(
+              function(p,v) { var val = info.value_accessor(v); for ( var i = 0; i < val.length; i++ ) { p[val[i]] = (p[val[i]] || 0) + 1; } return p; },
+              function(p,v) { var val = info.value_accessor(v); for ( var i = 0; i < val.length; i++ ) { p[val[i]] = (p[val[i]] || 1) - 1; } return p; },
+              function() { return {}; }
+            );
+        }
+        else {
+          return options.sum_field ? dim.group.reduceSum(options.sum_field) : dim.group().reduceCount();
+        }
     }
 
     for ( var propname in strategy ) { 

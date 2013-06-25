@@ -385,8 +385,9 @@ dc.chartStrategy = function() {
 	    }
 	    else if ( chart_type == "bar" ) {
 		value_accessor = chartStrategy.VALUE_ACCESSORS.standard(propname);
-		var max_domain = ( fm.type == "integer" || fm.type == "number" ) ?  fm.maximum + 1 : fm.maximum;
-		domain = d3.scale.linear().domain([fm.minimum, max_domain]);
+		var max_domain = ( fm.type == "integer" || fm.type == "number" ) ?  (+fm.maximum) + 1 : (+fm.maximum);
+		var min_domain = ( fm.type == "integer" || fm.type == "number" ) ?  (+fm.minimum) : fm.minimum;
+		domain = d3.scale.linear().domain([min_domain, max_domain]);
 		round = dc.round.floor;
 	    }
 	    else {
@@ -443,7 +444,7 @@ dc.chartStrategy = function() {
 }();
 
 
-dc.newCrossfilter = function(data, strategy) {
+dc.newCrossfilter = function(data, strategy, options) {
     var crfilt = crossfilter(data);
     var obj = { 
         "crossfilter": crfilt,
@@ -454,15 +455,15 @@ dc.newCrossfilter = function(data, strategy) {
 
     function dim_group(dim, info) {
         if ( info.type === 'array' ) {
-	    return dim.groupAll().reduce(
-		function(p,v) { var val = info.value_accessor(v); for ( var i = 0; i < val.length; i++ ) { p[val[i]] = (p[val[i]] || 0) + 1; } return p; },
-		function(p,v) { var val = info.value_accessor(v); for ( var i = 0; i < val.length; i++ ) { p[val[i]] = (p[val[i]] || 1) - 1; } return p; },
-		function() { return {}; }
-	    );
-	}
-	else {
-	    return dim.group();
-	}
+            return dim.groupAll().reduce(
+              function(p,v) { var val = info.value_accessor(v); for ( var i = 0; i < val.length; i++ ) { p[val[i]] = (p[val[i]] || 0) + 1; } return p; },
+              function(p,v) { var val = info.value_accessor(v); for ( var i = 0; i < val.length; i++ ) { p[val[i]] = (p[val[i]] || 1) - 1; } return p; },
+              function() { return {}; }
+            );
+        }
+        else {
+          return options.sum_field ? dim.group.reduceSum(options.sum_field) : dim.group().reduceCount();
+        }
     }
 
     for ( var propname in strategy ) { 
