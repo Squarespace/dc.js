@@ -467,7 +467,7 @@ dc.newCrossfilter = function(data, strategy, options) {
             );
         }
         else {
-          return options.sum_field ? dim.group.reduceSum(options.sum_field) : dim.group().reduceCount();
+          return options.sum_field ? dim.group().reduceSum(options.sum_field) : dim.group().reduceCount();
         }
     }
 
