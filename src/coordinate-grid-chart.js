@@ -118,7 +118,7 @@ dc.coordinateGridChart = function(chart) {
 
     chart.yAxisMax = function() {
         return d3.max(chart.group().all(), function(e) {
-            return chart.valueRetriever()(e);
+            return e.key == null ? 0 : chart.valueRetriever()(e);
         });
     };
 

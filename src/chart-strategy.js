@@ -9,14 +9,13 @@ dc.chartStrategy = function() {
     chartStrategy.STRING_CARDINALITY_THRESHOLD = 200;
     chartStrategy.STRING_CARDINALITY_PCT_THRESHOLD = .9;
 
+    var NULL_VALUE = "(none)";
+
     chartStrategy.VALUE_ACCESSORS = {
-        "standard": function(name) { return function(d) { var v = d[name]; return v == null ? "" : v; } },
-        "day": function(name) { return function(d) { 
-		return d3.time.day(d[name]); 
-	    } 
-	},
-        "hour": function(name) { return function(d) { return d[name] ? d[name].getHours() : null; } },
-        "weekday": function(name) { var names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']; return function(d) { return d[name] != null ? names[d[name].getDay()] : null;  };  }
+        "standard": function(name) { return function(d) { var v = d[name]; return v == null ? NULL_VALUE : v; } },
+        "day": function(name) { return function(d) { return d[name] == null ? null : d3.time.day(d[name]); } },
+        "hour": function(name) { return function(d) { return d[name] != null ? d[name].getHours() : null; } },
+        "weekday": function(name) { var names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']; return function(d) { return d[name] != null ? names[d[name].getDay()] : NULL_VALUE;  };  }
     };
 
     var computeDateDomain = function(minDate, maxDate) {
@@ -128,16 +127,19 @@ dc.chartStrategy = function() {
 
 	    // for date fields, push a special _hour dimension. and a _weekday dimension.
 	    if ( fm.type == "date" ) {
-	        var hour_fm = cloneObject(fm);
-		hour_fm.treatment = 'hour';
-		var hour_chart_def = gfs(propname, hour_fm);
-		hour_chart_def.field_name = propname + "_hour";
-		charts[propname + "_hour"] = hour_chart_def;
+          var hour_chart_grans = { 'hour': 1, 'minute': 1, 'second': 1 };
+          if ( hour_chart_grans[ fm.date_granularity ] ) {
+            var hour_fm = cloneObject(fm);
+            hour_fm.treatment = 'hour';
+            var hour_chart_def = gfs(propname, hour_fm);
+            hour_chart_def.field_name = propname + "_hour";
+            charts[propname + "_hour"] = hour_chart_def;
+          }
 	        var wd_fm = cloneObject(fm);
-		wd_fm.treatment = 'weekday';
-		var wd_chart_def = gfs(propname, wd_fm);
-		wd_chart_def.field_name = propname + "_weekday";
-		charts[propname + "_weekday"] = wd_chart_def;
+          wd_fm.treatment = 'weekday';
+          var wd_chart_def = gfs(propname, wd_fm);
+          wd_chart_def.field_name = propname + "_weekday";
+          charts[propname + "_weekday"] = wd_chart_def;
 	    }
 	}
 	return charts;

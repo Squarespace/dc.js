@@ -127,7 +127,9 @@ dc.schema = function() {
 	d3.time.format("%Y-%m-%d"),
 	d3.time.format("%m-%d-%Y %H:%M:%S"),
 	d3.time.format("%m-%d-%Y"),
-	d3.time.format("%m-%d-%Y %H:%M:%S")
+	d3.time.format("%m-%d-%Y %H:%M:%S"),
+	d3.time.format("%m/%d/%Y"),
+	d3.time.format("%m/%d/%Y %H:%M:%S")
     ];
 
     var parsePossibleDate = function(v) {
@@ -174,6 +176,31 @@ dc.schema = function() {
     };
 
     var newFieldMetadata = function() { return { "required": true, "cardinality": 0 }; };
+
+    var _date_granularities = {
+      'day': 1,
+      'hour': 2,
+      'minute': 3,
+      'second': 4
+    };
+
+    var setDateGranularity = function(fmd, d) {
+      if ( ! fmd.date_granularity ) {
+        fmd.date_granularity = 'month';
+      }
+      if ( d == null ) {
+        return;
+      }
+      if ( _date_granularities[ fmd.date_granularity ] < 4 && d.getSeconds() != 0 ) {
+        fmd.date_granularity = 'second';
+      }
+      else if ( _date_granularities[ fmd.date_granularity ] < 3 && d.getMinutes() != 0 ) {
+        fmd.date_granularity = 'minute';
+      }
+      else if ( _date_granularities[ fmd.date_granularity ] < 2 && d.getHours() != 0 ) {
+        fmd.date_granularity = 'hour';
+      }
+    };
 
     var determineDataType = function(v, currentType, coerce) {
 	var thisType = "unknown";
@@ -267,13 +294,22 @@ dc.schema = function() {
     }
     uniqs[val].count++;
 
-		// max and min.
-		if ( fmd.minimum === undefined || val < fmd.minimum ) 
-		    fmd.minimum = val;
-		if ( fmd.maximum === undefined || val > fmd.maximum ) 
-		    fmd.maximum = val;
-	    }
+		// max and min. for date, do a granularity check too.
+    if ( fmd.type == 'date' ) {
+      setDateGranularity(fmd, val);
+      if ( fmd.minimum == null || (val != null && val < fmd.minimum) ) 
+          fmd.minimum = val;
+      if ( fmd.maximum == null || (val != null && val > fmd.maximum) ) 
+          fmd.maximum = val;
+    }
+    else {
+      if ( fmd.minimum === undefined || val < fmd.minimum ) 
+          fmd.minimum = val;
+      if ( fmd.maximum === undefined || val > fmd.maximum ) 
+          fmd.maximum = val;
+    }
 	}
+  }
 
 	for ( var fname in props ) {
 	    var fmd = props[fname];
@@ -311,14 +347,13 @@ dc.chartStrategy = function() {
     chartStrategy.STRING_CARDINALITY_THRESHOLD = 200;
     chartStrategy.STRING_CARDINALITY_PCT_THRESHOLD = .9;
 
+    var NULL_VALUE = "(none)";
+
     chartStrategy.VALUE_ACCESSORS = {
-        "standard": function(name) { return function(d) { var v = d[name]; return v == null ? "" : v; } },
-        "day": function(name) { return function(d) { 
-		return d3.time.day(d[name]); 
-	    } 
-	},
-        "hour": function(name) { return function(d) { return d[name] ? d[name].getHours() : null; } },
-        "weekday": function(name) { var names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']; return function(d) { return d[name] != null ? names[d[name].getDay()] : null;  };  }
+        "standard": function(name) { return function(d) { var v = d[name]; return v == null ? NULL_VALUE : v; } },
+        "day": function(name) { return function(d) { return d[name] == null ? null : d3.time.day(d[name]); } },
+        "hour": function(name) { return function(d) { return d[name] != null ? d[name].getHours() : null; } },
+        "weekday": function(name) { var names = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']; return function(d) { return d[name] != null ? names[d[name].getDay()] : NULL_VALUE;  };  }
     };
 
     var computeDateDomain = function(minDate, maxDate) {
@@ -430,16 +465,19 @@ dc.chartStrategy = function() {
 
 	    // for date fields, push a special _hour dimension. and a _weekday dimension.
 	    if ( fm.type == "date" ) {
-	        var hour_fm = cloneObject(fm);
-		hour_fm.treatment = 'hour';
-		var hour_chart_def = gfs(propname, hour_fm);
-		hour_chart_def.field_name = propname + "_hour";
-		charts[propname + "_hour"] = hour_chart_def;
+          var hour_chart_grans = { 'hour': 1, 'minute': 1, 'second': 1 };
+          if ( hour_chart_grans[ fm.date_granularity ] ) {
+            var hour_fm = cloneObject(fm);
+            hour_fm.treatment = 'hour';
+            var hour_chart_def = gfs(propname, hour_fm);
+            hour_chart_def.field_name = propname + "_hour";
+            charts[propname + "_hour"] = hour_chart_def;
+          }
 	        var wd_fm = cloneObject(fm);
-		wd_fm.treatment = 'weekday';
-		var wd_chart_def = gfs(propname, wd_fm);
-		wd_chart_def.field_name = propname + "_weekday";
-		charts[propname + "_weekday"] = wd_chart_def;
+          wd_fm.treatment = 'weekday';
+          var wd_chart_def = gfs(propname, wd_fm);
+          wd_chart_def.field_name = propname + "_weekday";
+          charts[propname + "_weekday"] = wd_chart_def;
 	    }
 	}
 	return charts;
@@ -992,7 +1030,7 @@ dc.coordinateGridChart = function(chart) {
 
     chart.yAxisMax = function() {
         return d3.max(chart.group().all(), function(e) {
-            return chart.valueRetriever()(e);
+            return e.key == null ? 0 : chart.valueRetriever()(e);
         });
     };
 
@@ -1652,7 +1690,7 @@ dc.barChart = function(parent) {
         for (var i = 0; i < allGroups.length; ++i) {
             var group = allGroups[i];
             max += d3.max(group.all(), function(e) {
-                return chart.valueRetriever()(e);
+                return e.key == null ? 0 : chart.valueRetriever()(e);
             });
         }
 

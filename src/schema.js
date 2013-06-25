@@ -8,7 +8,9 @@ dc.schema = function() {
 	d3.time.format("%Y-%m-%d"),
 	d3.time.format("%m-%d-%Y %H:%M:%S"),
 	d3.time.format("%m-%d-%Y"),
-	d3.time.format("%m-%d-%Y %H:%M:%S")
+	d3.time.format("%m-%d-%Y %H:%M:%S"),
+	d3.time.format("%m/%d/%Y"),
+	d3.time.format("%m/%d/%Y %H:%M:%S")
     ];
 
     var parsePossibleDate = function(v) {
@@ -55,6 +57,31 @@ dc.schema = function() {
     };
 
     var newFieldMetadata = function() { return { "required": true, "cardinality": 0 }; };
+
+    var _date_granularities = {
+      'day': 1,
+      'hour': 2,
+      'minute': 3,
+      'second': 4
+    };
+
+    var setDateGranularity = function(fmd, d) {
+      if ( ! fmd.date_granularity ) {
+        fmd.date_granularity = 'month';
+      }
+      if ( d == null ) {
+        return;
+      }
+      if ( _date_granularities[ fmd.date_granularity ] < 4 && d.getSeconds() != 0 ) {
+        fmd.date_granularity = 'second';
+      }
+      else if ( _date_granularities[ fmd.date_granularity ] < 3 && d.getMinutes() != 0 ) {
+        fmd.date_granularity = 'minute';
+      }
+      else if ( _date_granularities[ fmd.date_granularity ] < 2 && d.getHours() != 0 ) {
+        fmd.date_granularity = 'hour';
+      }
+    };
 
     var determineDataType = function(v, currentType, coerce) {
 	var thisType = "unknown";
@@ -148,13 +175,22 @@ dc.schema = function() {
     }
     uniqs[val].count++;
 
-		// max and min.
-		if ( fmd.minimum === undefined || val < fmd.minimum ) 
-		    fmd.minimum = val;
-		if ( fmd.maximum === undefined || val > fmd.maximum ) 
-		    fmd.maximum = val;
-	    }
+		// max and min. for date, do a granularity check too.
+    if ( fmd.type == 'date' ) {
+      setDateGranularity(fmd, val);
+      if ( fmd.minimum == null || (val != null && val < fmd.minimum) ) 
+          fmd.minimum = val;
+      if ( fmd.maximum == null || (val != null && val > fmd.maximum) ) 
+          fmd.maximum = val;
+    }
+    else {
+      if ( fmd.minimum === undefined || val < fmd.minimum ) 
+          fmd.minimum = val;
+      if ( fmd.maximum === undefined || val > fmd.maximum ) 
+          fmd.maximum = val;
+    }
 	}
+  }
 
 	for ( var fname in props ) {
 	    var fmd = props[fname];

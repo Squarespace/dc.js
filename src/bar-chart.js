@@ -151,7 +151,7 @@ dc.barChart = function(parent) {
         for (var i = 0; i < allGroups.length; ++i) {
             var group = allGroups[i];
             max += d3.max(group.all(), function(e) {
-                return chart.valueRetriever()(e);
+                return e.key == null ? 0 : chart.valueRetriever()(e);
             });
         }
 
