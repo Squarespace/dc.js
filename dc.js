@@ -132,10 +132,15 @@ dc.schema = function() {
 
     var parsePossibleDate = function(v) {
         for ( var i = 0; i < DATE_FORMATS.length; i++ ) {
-	    var val = DATE_FORMATS[i].parse(v);
-	    if ( val != null ) { return val; }
-	}
-	return null;
+          // iso format parses many bare ints as strange dates. skip iso format
+          // if value too short.
+          if ( i == 0 && v.length < 12 ) {
+            continue;
+          }
+          var val = DATE_FORMATS[i].parse(v);
+          if ( val != null ) { return val; }
+        }
+        return null;
     };
 
 
