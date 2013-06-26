@@ -21,7 +21,7 @@ dc.pieChart = function(selector, hierarchical) {
     chart.renderLabel(true);
 
     chart.title(function(d) {
-        return chart.valuePrinter()(d.data.key) + ": " + chart.valuePrinter()(d.data.value);
+        return chart.valuePrinter()(d.data.key) + ": " + chart.valuePrinter()(d.data.value) + " (" + dc.percentFormat(d.data.value / chart._totalValue) + ")";
     });
 
     chart.transitionDuration(350);
@@ -36,6 +36,7 @@ dc.pieChart = function(selector, hierarchical) {
 
             dataPie = calculateDataPie();
             dataPieDimension = chart.dimension();
+            chart._totalValue = chart.dimension().groupAll().value();
 
             arc = chart.buildArcs();
 
@@ -179,6 +180,7 @@ dc.pieChart = function(selector, hierarchical) {
 
     function redrawTitles() {
         if (chart.renderTitle()) {
+          chart._totalValue = chart.dimension().groupAll().value();
             slices.selectAll("title").text(function(d) {
                 return chart.title()(d);
             });

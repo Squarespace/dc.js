@@ -33,15 +33,12 @@ dc.leaderboardChart = function(selector, hierarchical) {
           .attr("class", "row");
 
 
-        var pct_formatter = d3.format(".1p");
-        var num_formatter = d3.format("n");
-
         var columns = [
             function(d) {
               return d.data.key;
             },
             function(d) {
-              return num_formatter(d.data.value) + " (" + pct_formatter(d.data.value / totalValue) + ")";
+              return chart.valuePrinter()(d.data.value) + " (" + dc.percentFormat(d.data.value / totalValue) + ")";
             }
           ];
         
