@@ -311,7 +311,6 @@ dc.schema = function() {
     if ( fmd.type == 'date' ) {
       setDateGranularity(fmd, val);
       if ( fmd.minimum == null || fmd.minimum == "" || (val != null && val < fmd.minimum) )  {
-          console.log(fmd.minimum, val);
           fmd.minimum = val;
       }
       if ( fmd.maximum == null || fmd.maximum == "" || (val != null && val > fmd.maximum) ) 
