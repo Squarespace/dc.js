@@ -21,8 +21,9 @@ dc.baseChart = function(chart) {
     var _renderLabel = false;
 
     var _title = function(d) {
-        return dc.printers.value(d.key) + ": " + dc.printers.value(d.value);
+        return dc.printers.value(d.key) + ": " + dc.printers.value(d.value) + " (" + dc.percentFormat(d.value / chart.dimension().groupAll().value()) + ")";
     };
+
     var _renderTitle = false;
 
     var _transitionDuration = 750;

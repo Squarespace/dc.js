@@ -23,6 +23,8 @@ dc.leaderboardChart = function(selector, hierarchical) {
         
         var rowContainer = chart.root().append("div").attr("class", "row-container");
 
+        var totalValue = chart.dimension().groupAll().value();
+
         var rowEnter = rowContainer
           .selectAll("div.row")
           .data(dataPie(filteredData(chart.group().top(Infinity))))
@@ -31,12 +33,15 @@ dc.leaderboardChart = function(selector, hierarchical) {
           .attr("class", "row");
 
 
+        var pct_formatter = d3.format(".1p");
+        var num_formatter = d3.format("n");
+
         var columns = [
             function(d) {
               return d.data.key;
             },
             function(d) {
-              return d.data.value;
+              return num_formatter(d.data.value) + " (" + pct_formatter(d.data.value / totalValue) + ")";
             }
           ];
         

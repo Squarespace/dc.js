@@ -1,4 +1,6 @@
 dc.dateFormat= d3.time.format("%m/%d/%Y");
+dc.numberFormat = d3.format(",.0f");
+dc.percentFormat = d3.format(",.1p");
 
 dc.printers = {};
 
@@ -12,7 +14,7 @@ dc.printers.value = function(filter) {
     else if(typeof(filter) == "string")
         return filter;
     else if(typeof(filter) == "number")
-        return Math.round(filter);
+        return dc.numberFormat(filter);
     else
     	return "" + filter;
 };

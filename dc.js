@@ -88,6 +88,8 @@ dc.override = function(obj, functionName, newFunction) {
     };
 }
 dc.dateFormat= d3.time.format("%m/%d/%Y");
+dc.numberFormat = d3.format(",.0f");
+dc.percentFormat = d3.format(",.1p");
 
 dc.printers = {};
 
@@ -101,7 +103,7 @@ dc.printers.value = function(filter) {
     else if(typeof(filter) == "string")
         return filter;
     else if(typeof(filter) == "number")
-        return Math.round(filter);
+        return dc.numberFormat(filter);
     else
     	return "" + filter;
 };
@@ -295,17 +297,15 @@ dc.schema = function() {
 		    }
 		}
 
-		var uniqs = fmd.values;
-		if ( uniqs == null ) {
-		    uniqs = {};
-		    fmd.values = uniqs;
+		if ( fmd.values == null ) {
+		    fmd.values = {};
 		}
 		// val coerced to string for key, but kept intact for value.
-		if ( uniqs[val] === undefined )  {
+		if ( fmd.values[val] === undefined )  {
 		    fmd.cardinality++;
-		    uniqs[ val ] = { value: val, count: 0 };
+		    fmd.values[ val ] = { value: val, count: 0 };
     }
-    uniqs[val].count++;
+    fmd.values[val].count++;
 
 		// max and min. for date, do a granularity check too.
     if ( fmd.type == 'date' ) {
@@ -331,13 +331,13 @@ dc.schema = function() {
 		    delete fmd.values;
 	    }
       else {
-        var lfv, mfv;
+        var lfv = null, mfv = null;
         for ( var k in fmd.values ) {
           var val = fmd.values[k].count;
           if ( val == null ) continue;
-          if ( lfv == undefined || val < lfv ) 
+          if ( lfv == null || val < lfv ) 
             lfv = val;
-          if ( mfv == undefined || val > mfv ) 
+          if ( mfv == null || val > mfv ) 
             mfv = val;
         }
         fmd.least_value_frequency = lfv;
@@ -741,8 +741,9 @@ dc.baseChart = function(chart) {
     var _renderLabel = false;
 
     var _title = function(d) {
-        return dc.printers.value(d.key) + ": " + dc.printers.value(d.value);
+        return dc.printers.value(d.key) + ": " + dc.printers.value(d.value) + " (" + dc.percentFormat(d.value / chart.dimension().groupAll().value()) + ")";
     };
+
     var _renderTitle = false;
 
     var _transitionDuration = 750;
@@ -1770,6 +1771,8 @@ dc.leaderboardChart = function(selector, hierarchical) {
         
         var rowContainer = chart.root().append("div").attr("class", "row-container");
 
+        var totalValue = chart.dimension().groupAll().value();
+
         var rowEnter = rowContainer
           .selectAll("div.row")
           .data(dataPie(filteredData(chart.group().top(Infinity))))
@@ -1778,12 +1781,15 @@ dc.leaderboardChart = function(selector, hierarchical) {
           .attr("class", "row");
 
 
+        var pct_formatter = d3.format(".1p");
+        var num_formatter = d3.format("n");
+
         var columns = [
             function(d) {
               return d.data.key;
             },
             function(d) {
-              return d.data.value;
+              return num_formatter(d.data.value) + " (" + pct_formatter(d.data.value / totalValue) + ")";
             }
           ];
         

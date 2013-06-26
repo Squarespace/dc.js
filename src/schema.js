@@ -176,17 +176,15 @@ dc.schema = function() {
 		    }
 		}
 
-		var uniqs = fmd.values;
-		if ( uniqs == null ) {
-		    uniqs = {};
-		    fmd.values = uniqs;
+		if ( fmd.values == null ) {
+		    fmd.values = {};
 		}
 		// val coerced to string for key, but kept intact for value.
-		if ( uniqs[val] === undefined )  {
+		if ( fmd.values[val] === undefined )  {
 		    fmd.cardinality++;
-		    uniqs[ val ] = { value: val, count: 0 };
+		    fmd.values[ val ] = { value: val, count: 0 };
     }
-    uniqs[val].count++;
+    fmd.values[val].count++;
 
 		// max and min. for date, do a granularity check too.
     if ( fmd.type == 'date' ) {
@@ -212,13 +210,13 @@ dc.schema = function() {
 		    delete fmd.values;
 	    }
       else {
-        var lfv, mfv;
+        var lfv = null, mfv = null;
         for ( var k in fmd.values ) {
           var val = fmd.values[k].count;
           if ( val == null ) continue;
-          if ( lfv == undefined || val < lfv ) 
+          if ( lfv == null || val < lfv ) 
             lfv = val;
-          if ( mfv == undefined || val > mfv ) 
+          if ( mfv == null || val > mfv ) 
             mfv = val;
         }
         fmd.least_value_frequency = lfv;
