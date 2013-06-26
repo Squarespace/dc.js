@@ -133,6 +133,8 @@ dc.schema = function() {
     ];
 
     var parsePossibleDate = function(v) {
+        // short-circuit on number: if in expected range for epoch seconds or millis,
+        // interpret it that way.
         for ( var i = 0; i < DATE_FORMATS.length; i++ ) {
           // iso format parses many bare ints as strange dates. skip iso format
           // if value too short.
@@ -203,14 +205,18 @@ dc.schema = function() {
     var newFieldMetadata = function() { return { "required": true, "cardinality": 0 }; };
 
     var determineDataType = function(v, currentType, coerce) {
-	var thisType = "unknown";
+	var thisType = null;
 	var v_typeof = typeof(v);
 	var coercedValue = v;
 	var wasCoerced = false;
-	if( Object.prototype.toString.call( v ) === '[object Array]' ) {
+  var valueIsNullish = ( v == null || v == "" );
+  if ( valueIsNullish ) {
+    // do nothing.
+  }
+  else if( Object.prototype.toString.call( v ) === '[object Array]' ) {
 	    thisType = 'array';
 	}
-        else if ( v_typeof == "string" ) {
+  else if ( v_typeof == "string" ) {
 	    var pdate = parsePossibleDate(v);
 	    if ( pdate != null ) {
 		thisType = "date";
@@ -232,13 +238,20 @@ dc.schema = function() {
 	    thisType = "date";
 	
 	if ( currentType != null && thisType != currentType ) {
-	    if ( thisType == "number" && currentType == "integer" ) 
+      if ( valueIsNullish && currentType == "date" ) {
+          thisType = "date";
+          coercedValue = null;
+          wasCoerced = true;
+      }
+      else if ( valueIsNullish ) 
+          thisType = currentType;
+      else if ( thisType == "number" && currentType == "integer" ) 
 	        thisType = "number";
-	    if ( thisType == "integer" && currentType == "number" ) 
+      else if ( thisType == "integer" && currentType == "number" ) 
 	        thisType = "number";
-	    if ( thisType == "date" && currentType == "string" ) 
+      else if ( thisType == "date" && currentType == "string" ) 
 	        thisType = "string";
-	    else
+	    else 
 	        thisType = "mixed";
 	}
 	return  { 'type' : thisType, 'coercedValue' : coercedValue, 'wasCoerced' : wasCoerced };
@@ -272,9 +285,9 @@ dc.schema = function() {
 		else {
 		    var currentType = fmd.type;
 		    var thisType = determineDataType(val, currentType, coerce);
-		    if ( currentType == null ) 
+		    if ( currentType == null )
 		        fmd.type = thisType.type;
-	            else if ( thisType.type != currentType ) 
+        else if ( thisType.type != currentType ) 
 		        fmd.type = "mixed";
 		    if ( thisType.wasCoerced ) {
 			val = thisType.coercedValue;
@@ -297,9 +310,11 @@ dc.schema = function() {
 		// max and min. for date, do a granularity check too.
     if ( fmd.type == 'date' ) {
       setDateGranularity(fmd, val);
-      if ( fmd.minimum == null || (val != null && val < fmd.minimum) ) 
+      if ( fmd.minimum == null || fmd.minimum == "" || (val != null && val < fmd.minimum) )  {
+          console.log(fmd.minimum, val);
           fmd.minimum = val;
-      if ( fmd.maximum == null || (val != null && val > fmd.maximum) ) 
+      }
+      if ( fmd.maximum == null || fmd.maximum == "" || (val != null && val > fmd.maximum) ) 
           fmd.maximum = val;
     }
     else {
