@@ -1,6 +1,7 @@
 dc.baseChart = function(chart) {
     var _dimension;
     var _group;
+    var _groupAll;
 
     var _anchor;
     var _root;
@@ -35,12 +36,19 @@ dc.baseChart = function(chart) {
     chart.dimension = function(d) {
         if (!arguments.length) return _dimension;
         _dimension = d;
+        chart.groupAll(d.groupAll());
         return chart;
     };
 
     chart.group = function(g) {
         if (!arguments.length) return _group;
         _group = g;
+        return chart;
+    };
+
+    chart.groupAll = function(ga) {
+        if (!arguments.length) return _groupAll;
+        _groupAll = ga;
         return chart;
     };
 

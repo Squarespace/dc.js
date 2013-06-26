@@ -23,7 +23,7 @@ dc.leaderboardChart = function(selector, hierarchical) {
         
         var rowContainer = chart.root().append("div").attr("class", "row-container");
 
-        var totalValue = chart.dimension().groupAll().value();
+        var totalValue = chart.groupAll().value();
 
         var rowEnter = rowContainer
           .selectAll("div.row")

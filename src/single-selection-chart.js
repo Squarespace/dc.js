@@ -48,6 +48,7 @@ dc.singleSelectionChart = function(chart, hierarchical) {
 	else {
 		var _dimensions = [];
 		var _groups = [];
+    var _groupAlls = [];
 		var _filters = [];
 
 		var _latestFilter = function() {
@@ -109,7 +110,7 @@ dc.singleSelectionChart = function(chart, hierarchical) {
 
 		chart.dimension = function() {
 			if (arguments.length) {
-				throw "Cannot call dimension() with argument, must call addDimensionAndGroup(d, g)";
+				throw "Cannot call dimension() with argument, must call addDimensionAndGroup(d, g, ga)";
 			}
 			return (_dimensions.length == 0) ? null : _dimensions[Math.min(
 					_filters.length, _dimensions.length - 1)];
@@ -117,15 +118,25 @@ dc.singleSelectionChart = function(chart, hierarchical) {
 
 		chart.group = function() {
 			if (arguments.length) {
-				throw "Cannot call group() with argument, must call addDimensionAndGroup(d, g)";
+				throw "Cannot call group() with argument, must call addDimensionAndGroup(d, g, ga)";
 			}
 			return (_groups.length == 0) ? null : _groups[Math.min(
 					_filters.length, _groups.length - 1)];
 		};
 
-		chart.addDimensionAndGroup = function(d, g) {
+		chart.groupAll = function() {
+			if (arguments.length) {
+				throw "Cannot call groupAll() with argument, must call addDimensionAndGroup(d, g, ga)";
+			}
+			return (_groupAlls.length == 0) ? null : _groupAlls[Math.min(
+					_filters.length, _groupAlls.length - 1)];
+		};
+
+
+		chart.addDimensionAndGroup = function(d, g, ga) {
 			_dimensions.push(d);
 			_groups.push(g);
+			_groupAlls.push(ga);
 			return chart;
 		};
 

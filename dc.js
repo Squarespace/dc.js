@@ -507,28 +507,32 @@ dc.newCrossfilter = function(data, strategy, options) {
         "crossfilter": crfilt,
         "dimensions": {}, 
         "groups": {}, 
+        "groupalls": {}, 
         "info": {}
     };  
 
-    function dim_group(dim, info) {
+    function dim_group(dim_grpobj, info) {
         if ( info.type === 'array' ) {
-            return dim.groupAll().reduce(
+            return dim_grpobj.reduce(
               function(p,v) { var val = info.value_accessor(v); for ( var i = 0; i < val.length; i++ ) { p[val[i]] = (p[val[i]] || 0) + 1; } return p; },
               function(p,v) { var val = info.value_accessor(v); for ( var i = 0; i < val.length; i++ ) { p[val[i]] = (p[val[i]] || 1) - 1; } return p; },
               function() { return {}; }
             );
         }
         else {
-          return options.sum_field ? dim.group().reduceSum(options.sum_field) : dim.group().reduceCount();
+          return options.sum_field ? dim_grpobj.reduceSum(options.sum_field) : dim_grpobj.reduceCount();
         }
     }
+
 
     for ( var propname in strategy ) { 
         var info = strategy[propname];
         var dim = crfilt.dimension(info.value_accessor);
-        var grp = dim_group(dim, info);
+        var grp = dim_group(dim.group(), info);
+        var grpall = dim_group(dim.groupAll(), info);
         obj.dimensions[propname] = dim;
         obj.groups[propname] = grp;
+        obj.groupalls[propname] = grpall;
         obj.info[propname] = info;
     }   
 
@@ -595,15 +599,19 @@ dc.chartBuilder = function() {
 	    crossfilter_obj.info[hier_name] = hlist;
 	    var dims = [];
 	    var grps = [];
+	    var grpalls = [];
 	    for ( var i = 0; i < hlist.length; i++ ) {
 		var info = hlist[i];
 		dims.push(crossfilter_obj.dimensions[info.field_name]);
 		grps.push(crossfilter_obj.groups[info.field_name]);
+		grpalls.push(crossfilter_obj.groupalls[info.field_name]);
 		delete crossfilter_obj.dimensions[info.field_name];
 		delete crossfilter_obj.groups[info.field_name];
+		delete crossfilter_obj.groupalls[info.field_name];
 	    }
 	    crossfilter_obj.dimensions[hier_name] = dims;
 	    crossfilter_obj.groups[hier_name] = grps;
+	    crossfilter_obj.groupalls[hier_name] = grpalls;
 	    crossfilter_obj.info[hier_name] = hlist[0];
 	    crossfilter_obj.info[hier_name].hierarchical = true;
 	}
@@ -644,6 +652,7 @@ dc.chartBuilder = function() {
 		.margins(chartBuilder.defaultMargins)
 		.dimension(crossfilter_obj.dimensions[propname])
 		.group(crossfilter_obj.groups[propname])
+		.groupAll(crossfilter_obj.groupalls[propname])
 		.elasticY(true)
 		.x(info.domain)
 		.round(info.round);
@@ -652,6 +661,7 @@ dc.chartBuilder = function() {
 	    else if ( info.type == "pie" ) {
 		var dim = crossfilter_obj.dimensions[propname];
 		var grp = crossfilter_obj.groups[propname];
+		var grpall = crossfilter_obj.groupalls[propname];
 		chart = dc.pieChart("#" + selector, Array.isArray(dim))
 		.width(chartBuilder.defaultPieSize)
 		.height(chartBuilder.defaultPieSize)
@@ -662,16 +672,17 @@ dc.chartBuilder = function() {
 
 		if ( Array.isArray(dim) ) {
 		    for ( var j = 0; j < dim.length; j++ ) {
-			chart.addDimensionAndGroup(dim[j], grp[j]);
+			chart.addDimensionAndGroup(dim[j], grp[j], grpall[j]);
 		    }
 		}
 		else {
-		    chart.dimension(dim).group(grp);
+		    chart.dimension(dim).group(grp).groupAll(grpall);
 		}
 	    }
 	    else if ( info.type == "leaderboard" ) {
 		var dim = crossfilter_obj.dimensions[propname];
 		var grp = crossfilter_obj.groups[propname];
+		var grpall = crossfilter_obj.groupalls[propname];
 		chart = dc.leaderboardChart("#" + selector, Array.isArray(dim))
 		.width(chartBuilder.defaultTableWidth)
 		.height(chartBuilder.defaultTableHeight)
@@ -680,11 +691,11 @@ dc.chartBuilder = function() {
 
 		if ( Array.isArray(dim) ) {
 		    for ( var j = 0; j < dim.length; j++ ) {
-			chart.addDimensionAndGroup(dim[j], grp[j]);
+			chart.addDimensionAndGroup(dim[j], grp[j], grpall[j]);
 		    }
 		}
 		else {
-		    chart.dimension(dim).group(grp);
+		    chart.dimension(dim).group(grp).groupAll(grpall);
 		}
 	    }
 	    charts[selector] = chart;
@@ -721,6 +732,7 @@ dc.chartBuilder = function() {
 dc.baseChart = function(chart) {
     var _dimension;
     var _group;
+    var _groupAll;
 
     var _anchor;
     var _root;
@@ -755,12 +767,19 @@ dc.baseChart = function(chart) {
     chart.dimension = function(d) {
         if (!arguments.length) return _dimension;
         _dimension = d;
+        chart.groupAll(d.groupAll());
         return chart;
     };
 
     chart.group = function(g) {
         if (!arguments.length) return _group;
         _group = g;
+        return chart;
+    };
+
+    chart.groupAll = function(ga) {
+        if (!arguments.length) return _groupAll;
+        _groupAll = ga;
         return chart;
     };
 
@@ -1257,6 +1276,7 @@ dc.singleSelectionChart = function(chart, hierarchical) {
 	else {
 		var _dimensions = [];
 		var _groups = [];
+    var _groupAlls = [];
 		var _filters = [];
 
 		var _latestFilter = function() {
@@ -1318,7 +1338,7 @@ dc.singleSelectionChart = function(chart, hierarchical) {
 
 		chart.dimension = function() {
 			if (arguments.length) {
-				throw "Cannot call dimension() with argument, must call addDimensionAndGroup(d, g)";
+				throw "Cannot call dimension() with argument, must call addDimensionAndGroup(d, g, ga)";
 			}
 			return (_dimensions.length == 0) ? null : _dimensions[Math.min(
 					_filters.length, _dimensions.length - 1)];
@@ -1326,15 +1346,25 @@ dc.singleSelectionChart = function(chart, hierarchical) {
 
 		chart.group = function() {
 			if (arguments.length) {
-				throw "Cannot call group() with argument, must call addDimensionAndGroup(d, g)";
+				throw "Cannot call group() with argument, must call addDimensionAndGroup(d, g, ga)";
 			}
 			return (_groups.length == 0) ? null : _groups[Math.min(
 					_filters.length, _groups.length - 1)];
 		};
 
-		chart.addDimensionAndGroup = function(d, g) {
+		chart.groupAll = function() {
+			if (arguments.length) {
+				throw "Cannot call groupAll() with argument, must call addDimensionAndGroup(d, g, ga)";
+			}
+			return (_groupAlls.length == 0) ? null : _groupAlls[Math.min(
+					_filters.length, _groupAlls.length - 1)];
+		};
+
+
+		chart.addDimensionAndGroup = function(d, g, ga) {
 			_dimensions.push(d);
 			_groups.push(g);
+			_groupAlls.push(ga);
 			return chart;
 		};
 
@@ -1380,7 +1410,7 @@ dc.pieChart = function(selector, hierarchical) {
 
             dataPie = calculateDataPie();
             dataPieDimension = chart.dimension();
-            chart._totalValue = chart.dimension().groupAll().value();
+            chart._totalValue = chart.groupAll().value();
 
             arc = chart.buildArcs();
 
@@ -1524,7 +1554,7 @@ dc.pieChart = function(selector, hierarchical) {
 
     function redrawTitles() {
         if (chart.renderTitle()) {
-          chart._totalValue = chart.dimension().groupAll().value();
+          chart._totalValue = chart.groupAll().value();
             slices.selectAll("title").text(function(d) {
                 return chart.title()(d);
             });
@@ -1773,7 +1803,7 @@ dc.leaderboardChart = function(selector, hierarchical) {
         
         var rowContainer = chart.root().append("div").attr("class", "row-container");
 
-        var totalValue = chart.dimension().groupAll().value();
+        var totalValue = chart.groupAll().value();
 
         var rowEnter = rowContainer
           .selectAll("div.row")

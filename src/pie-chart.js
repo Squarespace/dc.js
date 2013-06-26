@@ -36,7 +36,7 @@ dc.pieChart = function(selector, hierarchical) {
 
             dataPie = calculateDataPie();
             dataPieDimension = chart.dimension();
-            chart._totalValue = chart.dimension().groupAll().value();
+            chart._totalValue = chart.groupAll().value();
 
             arc = chart.buildArcs();
 
@@ -180,7 +180,7 @@ dc.pieChart = function(selector, hierarchical) {
 
     function redrawTitles() {
         if (chart.renderTitle()) {
-          chart._totalValue = chart.dimension().groupAll().value();
+          chart._totalValue = chart.groupAll().value();
             slices.selectAll("title").text(function(d) {
                 return chart.title()(d);
             });
