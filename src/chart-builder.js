@@ -201,13 +201,23 @@ dc.chartBuilder = function() {
 	}
 
 	// a reset-all link
-	selection.append("div")
-	    .attr("id", "#reset-all").classed("reset", true)
+  var reset_all_div = d3.select("#reset-all");
+  if ( reset_all_div.empty() ) {
+    reset_all_div = selection.append("div").attr("id", "reset-all");
+  } else {
+    reset_all_div = reset_all_div.node();
+  }
+  reset_all_div.classed("reset", true)
 	    .attr("onclick", "dc.filterAll();dc.redrawAll();return true")
 	    .text("Reset all");
 
-	// a data-count
-	var dc_div = selection.append("div").attr("id", "data-count");
+	// a data-count is appended if one does not exist.
+  var dc_div = d3.select("#data-count");
+  if ( dc_div.empty() ) {
+    dc_div = selection.append("div").attr("id", "data-count");
+  } else {
+    dc_div = dc_div;
+  }
 	dc_div.append("span").classed("filter-count", true).text("-");
 	dc_div.append("span").text(" (");
 	dc_div.append("span").classed("filter-pct", true).text("-");
@@ -215,7 +225,7 @@ dc.chartBuilder = function() {
 	dc_div.append("span").classed("total-count", true).text("-");
 	dc_div.append("span").text(" items selected.");
 
-	charts['data-count'] = dc.dataCount("#data-count")
+	charts['data-count'] = dc.dataCount(dc_div)
 	                         .dimension(crossfilter_obj.crossfilter)
 				 .group(crossfilter_obj.topGroup)
 				 .groupAll(crossfilter_obj.topGroup);

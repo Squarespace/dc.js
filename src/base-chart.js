@@ -76,9 +76,12 @@ dc.baseChart = function(chart) {
 
     chart.anchor = function(a) {
         if (!arguments.length) return _anchor;
-        if (a instanceof Object) {
+        if (a instanceof Object && a.anchor && a.root) {
             _anchor = a.anchor();
             _root = a.root();
+        } else if (a instanceof Object && a.append && a.classed) {
+            _anchor = a.node();
+            _root = a;
         } else {
             _anchor = a;
             _root = d3.select(_anchor);
