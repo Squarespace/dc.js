@@ -720,7 +720,8 @@ dc.chartBuilder = function() {
 
 	charts['data-count'] = dc.dataCount("#data-count")
 	                         .dimension(crossfilter_obj.crossfilter)
-				 .group(crossfilter_obj.topGroup);
+				 .group(crossfilter_obj.topGroup)
+				 .groupAll(crossfilter_obj.topGroup);
 
 	// TODO a data-table
 
@@ -1868,10 +1869,11 @@ dc.dataCount = function(selector) {
     // I wish there were a better way.
     var total = null;
 
-    var _superGroup = chart.group;
-    chart.group = function() {
-      var rv = _superGroup.apply(undefined, arguments);
-      total = _superGroup().value();
+    var _superGroupAll = chart.groupAll;
+    chart.groupAll = function() {
+      var rv = _superGroupAll.apply(undefined, arguments);
+      if ( arguments.length > 0 )
+        total = _superGroupAll().value();
       return rv;
     };
 

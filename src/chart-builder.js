@@ -217,7 +217,8 @@ dc.chartBuilder = function() {
 
 	charts['data-count'] = dc.dataCount("#data-count")
 	                         .dimension(crossfilter_obj.crossfilter)
-				 .group(crossfilter_obj.topGroup);
+				 .group(crossfilter_obj.topGroup)
+				 .groupAll(crossfilter_obj.topGroup);
 
 	// TODO a data-table
 
