@@ -11,10 +11,10 @@ suite.addBatch({
             var div = d3.select("body").append("div").attr("id", "data-count");
             div.append("span").attr("class", "filter-count");
             div.append("span").attr("class", "total-count");
-            countryDimension.filter("CA");
             var chart = dc.dataCount("#data-count")
                 .dimension(data)
                 .group(groupAll);
+            countryDimension.filter("CA");
             chart.render();
             return chart;
         },

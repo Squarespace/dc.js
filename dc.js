@@ -536,6 +536,8 @@ dc.newCrossfilter = function(data, strategy, options) {
         obj.info[propname] = info;
     }   
 
+    obj.topGroup = dim_group(crfilt.groupAll(), {});
+
     return obj;
 };  
 
@@ -718,7 +720,7 @@ dc.chartBuilder = function() {
 
 	charts['data-count'] = dc.dataCount("#data-count")
 	                         .dimension(crossfilter_obj.crossfilter)
-				 .group(crossfilter_obj.crossfilter.groupAll());
+				 .group(crossfilter_obj.topGroup);
 
 	// TODO a data-table
 
@@ -813,8 +815,8 @@ dc.baseChart = function(chart) {
         } else {
             _anchor = a;
             _root = d3.select(_anchor);
-            dc.registerChart(chart);
         }
+        dc.registerChart(chart);
         return chart;
     };
 
@@ -1860,16 +1862,24 @@ dc.leaderboardChart = function(selector, hierarchical) {
     return chart.anchor(selector);
 };
 dc.dataCount = function(selector) {
-    var formatNumber = d3.format(",d");
-    var formatPct = d3.format("2.1f");
     var chart = dc.baseChart({});
+    //
+    // do this upon instantiation to store the unfiltered crossfilter rollup value.
+    // I wish there were a better way.
+    var total = null;
+
+    var _superGroup = chart.group;
+    chart.group = function() {
+      var rv = _superGroup.apply(undefined, arguments);
+      total = _superGroup().value();
+      return rv;
+    };
 
     chart.render = function() {
-	var total = chart.dimension().size();
-	var filt = chart.group().value();
-        chart.selectAll(".total-count").text(formatNumber(total));
-        chart.selectAll(".filter-count").text(formatNumber(filt));
-        chart.selectAll(".filter-pct").text(( total == 0 ) ? "-" : (formatPct(filt/total*100.0) + "%"));
+        var filt = chart.group().value();
+        chart.selectAll(".total-count").text(chart.valuePrinter()(total));
+        chart.selectAll(".filter-count").text(chart.valuePrinter()(filt));
+        chart.selectAll(".filter-pct").text(( total == null || total == 0 ) ? "-" : (dc.percentFormat(filt/total)));
 
         return chart;
     };

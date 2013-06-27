@@ -33,6 +33,8 @@ dc.newCrossfilter = function(data, strategy, options) {
         obj.info[propname] = info;
     }   
 
+    obj.topGroup = dim_group(crfilt.groupAll(), {});
+
     return obj;
 };  
 
@@ -215,7 +217,7 @@ dc.chartBuilder = function() {
 
 	charts['data-count'] = dc.dataCount("#data-count")
 	                         .dimension(crossfilter_obj.crossfilter)
-				 .group(crossfilter_obj.crossfilter.groupAll());
+				 .group(crossfilter_obj.topGroup);
 
 	// TODO a data-table
 

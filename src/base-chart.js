@@ -82,8 +82,8 @@ dc.baseChart = function(chart) {
         } else {
             _anchor = a;
             _root = d3.select(_anchor);
-            dc.registerChart(chart);
         }
+        dc.registerChart(chart);
         return chart;
     };
 
