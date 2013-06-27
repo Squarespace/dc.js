@@ -204,8 +204,6 @@ dc.chartBuilder = function() {
   var reset_all_div = d3.select("#reset-all");
   if ( reset_all_div.empty() ) {
     reset_all_div = selection.append("div").attr("id", "reset-all");
-  } else {
-    reset_all_div = reset_all_div.node();
   }
   reset_all_div.classed("reset", true)
 	    .attr("onclick", "dc.filterAll();dc.redrawAll();return true")
@@ -215,8 +213,6 @@ dc.chartBuilder = function() {
   var dc_div = d3.select("#data-count");
   if ( dc_div.empty() ) {
     dc_div = selection.append("div").attr("id", "data-count");
-  } else {
-    dc_div = dc_div;
   }
 	dc_div.append("span").classed("filter-count", true).text("-");
 	dc_div.append("span").text(" (");
